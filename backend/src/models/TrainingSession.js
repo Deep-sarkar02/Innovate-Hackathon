@@ -22,6 +22,12 @@ const sessionBriefSchema = new mongoose.Schema(
     goal: { type: String },
     cohortId: { type: String, required: true },
     cohortVersion: { type: Number, required: true },
+    // These were always returned by the planner but silently DROPPED by this
+    // strict schema — so the customer agent read undefined at reply time.
+    customerName: { type: String },
+    language: { type: String },
+    city: { type: String },
+    region: { type: String },
   },
   { _id: false }
 );
@@ -36,6 +42,9 @@ const customerStateSchema = new mongoose.Schema(
     academicAnxiety: { type: Number, default: 60, min: 0, max: 100 },
     competitorAffinity: { type: Number, default: 40, min: 0, max: 100 },
     decisionReadiness: { type: Number, default: 20, min: 0, max: 100 },
+    // Topics the rep has already used — powers diminishing returns so
+    // repeating "scholarship" five times is not five boosts.
+    mentionedTopics: { type: [String], default: [] },
   },
   { _id: false }
 );

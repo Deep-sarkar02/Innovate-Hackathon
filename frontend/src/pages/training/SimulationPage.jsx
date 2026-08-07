@@ -49,7 +49,7 @@ export default function SimulationPage() {
 
   const handleCustomerReply = useCallback((text) => speak(text), [speak]);
 
-  const { transcript, customerState, sessionBrief, thinking, appendTurn } = useTrainingSession(sessionId, {
+  const { transcript, customerState, sessionBrief, thinking, aiMode, appendTurn } = useTrainingSession(sessionId, {
     enabled: !sessionEnded,
     onCustomerReply: handleCustomerReply,
   });
@@ -110,6 +110,12 @@ export default function SimulationPage() {
       )}
 
       <main className="max-w-6xl mx-auto px-4 py-6">
+        {aiMode === 'mock' && (
+          <div className="mb-4 rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+            ⚠ SIMULATION MODE — the AI service is unavailable, so customer replies and scoring
+            are deterministic stand-ins. Check OPENAI_API_KEY / the /health endpoint.
+          </div>
+        )}
         {brief && (
           <div className="mb-6">
             <SessionBriefCard sessionBrief={brief} />

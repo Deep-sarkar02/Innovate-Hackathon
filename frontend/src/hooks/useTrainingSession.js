@@ -7,6 +7,7 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
   const [customerState, setCustomerState] = useState(null);
   const [sessionBrief, setSessionBrief] = useState(null);
   const [thinking, setThinking] = useState(false);
+  const [aiMode, setAiMode] = useState(null); // 'llm' | 'mock'
   const processingRef = useRef(false);
   const onCustomerReplyRef = useRef(onCustomerReply);
   onCustomerReplyRef.current = onCustomerReply;
@@ -40,6 +41,7 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
         });
         if (data.transcript) setTranscript(data.transcript);
         if (data.customerState) setCustomerState(data.customerState);
+        if (data.aiMode) setAiMode(data.aiMode);
         if (data.customerReply?.text) onCustomerReplyRef.current?.(data.customerReply.text);
       } catch (err) {
         logApiError('training-session/turn', err);
@@ -56,6 +58,7 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
     customerState,
     sessionBrief,
     thinking,
+    aiMode,
     appendTurn,
   };
 }

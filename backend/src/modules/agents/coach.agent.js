@@ -5,19 +5,35 @@ import { getRecommendationsForSkills } from '../lms-recommend/recommend.service.
 import { checkReinforcement } from '../coaching/reinforcement.service.js';
 import { SessionInsight } from '../../models/SessionInsight.js';
 
-function computeDeltas(observerScores, currentGraph, objective) {
+// Max the graph can move on ONE session. Second-order guard: without a cap,
+// a single noisy evaluation (or a rep who found a phrase that games the
+// Observer) swings the graph, which redirects the planner, which changes
+// what everyone trains next. One session is one data point.
+const MAX_DELTA_PER_SESSION = 8;
+
+// exported for unit tests
+export function computeDeltas(observerOutput, currentGraph, objective) {
   const deltas = [];
   const graphMap = Object.fromEntries(currentGraph.map((s) => [s.skillId, s.score]));
 
-  for (const [skillId, observedScore] of Object.entries(observerScores.scores ?? {})) {
+  // Confidence-weight the learning rate: a mock/heuristic evaluation
+  // (confidence ≤35) moves the graph at a fraction of a real one.
+  const confidence = (observerOutput.confidence ?? 50) / 100;
+  const learningRate = 0.3 * confidence;
+
+  for (const [skillId, observedScore] of Object.entries(observerOutput.scores ?? {})) {
+    // Only skills the Observer actually scored (evidence-backed) arrive here —
+    // unobserved skills are omitted upstream and must never move.
     const current = graphMap[skillId] ?? 50;
-    const target = observedScore;
-    const delta = Math.round((target - current) * 0.3);
+    const raw = Math.round((observedScore - current) * learningRate);
+    const delta = Math.max(-MAX_DELTA_PER_SESSION, Math.min(MAX_DELTA_PER_SESSION, raw));
     if (delta !== 0) {
       deltas.push({
         skillId,
         delta,
-        reason: skillId === objective ? 'Primary session objective' : 'Observed during session',
+        reason:
+          (skillId === objective ? 'Primary session objective' : 'Observed during session')
+          + (observerOutput.mode === 'mock' ? ' (heuristic evaluation — low weight)' : ''),
       });
     }
   }
@@ -97,8 +113,11 @@ export async function coachSession({
     highlights: observerOutput.highlights ?? [],
     keyQuotes: observerOutput.keyQuotes ?? [],
     confidence: observerOutput.confidence ?? 50,
+    evaluationMode: observerOutput.mode ?? 'mock',
+    evidenceQuotes: observerOutput.evidenceQuotes ?? {},
     durationMinutes,
-    overallScore: observerOutput.overallScore ?? 50,
+    // null when the objective skill was never exercised — do not fake a 50
+    ...(observerOutput.overallScore != null ? { overallScore: observerOutput.overallScore } : {}),
     coachFeedback,
     lmsRecommendations,
     observerScores: observerOutput.scores ?? {},

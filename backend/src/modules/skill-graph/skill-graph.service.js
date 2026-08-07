@@ -43,46 +43,46 @@ export async function getWeakestSkills(userId, limit = 5) {
 }
 
 export async function applySkillDeltas(userId, sessionId, deltas) {
+  if (deltas.length === 0) return [];
+
+  // One read + one bulkWrite + one insertMany — the previous version issued
+  // 2 sequential round-trips PER skill (findOne + save + create), ~90 queries
+  // on a 45-skill session.
+  const skillIds = deltas.map((d) => d.skillId);
+  const progressDocs = await UserSkillProgress.find({ userId, skillId: { $in: skillIds } }).lean();
+  const progressMap = Object.fromEntries(progressDocs.map((p) => [p.skillId, p]));
+
   const updates = [];
+  const bulkOps = [];
+  const logDocs = [];
+  const now = new Date();
 
   for (const { skillId, delta, reason } of deltas) {
-    const progress = await UserSkillProgress.findOne({ userId, skillId });
+    const progress = progressMap[skillId];
     if (!progress) continue;
 
     const previousScore = progress.score;
     const newScore = Math.max(0, Math.min(100, previousScore + delta));
+    const improvementStreak = delta > 0 ? (progress.improvementStreak ?? 0) + 1 : 0;
 
-    progress.lastScore = previousScore;
-    progress.score = newScore;
-    progress.trend = newScore - previousScore;
-    progress.sessionCount += 1;
-    progress.attemptCount += 1;
-    progress.lastUpdated = new Date();
+    const set = {
+      lastScore: previousScore,
+      score: newScore,
+      trend: newScore - previousScore,
+      sessionCount: (progress.sessionCount ?? 0) + 1,
+      attemptCount: (progress.attemptCount ?? 0) + 1,
+      improvementStreak,
+      lastUpdated: now,
+    };
+    if (newScore >= 80 && improvementStreak >= 3) set.masteredAt = now;
 
-    if (delta > 0) {
-      progress.improvementStreak += 1;
-    } else {
-      progress.improvementStreak = 0;
-    }
-
-    if (newScore >= 80 && progress.improvementStreak >= 3) {
-      progress.masteredAt = new Date();
-    }
-
-    await progress.save();
-
-    await SkillUpdate.create({
-      userId,
-      sessionId,
-      skillId,
-      previousScore,
-      newScore,
-      delta,
-      reason,
-    });
-
+    bulkOps.push({ updateOne: { filter: { userId, skillId }, update: { $set: set } } });
+    logDocs.push({ userId, sessionId, skillId, previousScore, newScore, delta, reason });
     updates.push({ skillId, previousScore, newScore, delta });
   }
+
+  if (bulkOps.length > 0) await UserSkillProgress.bulkWrite(bulkOps, { ordered: false });
+  if (logDocs.length > 0) await SkillUpdate.insertMany(logDocs);
 
   return updates;
 }

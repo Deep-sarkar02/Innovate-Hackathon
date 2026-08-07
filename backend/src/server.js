@@ -19,7 +19,9 @@ async function start() {
 
   app.listen(env.port, () => {
     console.log(`[server] Adaptive Sales Training Platform API on http://localhost:${env.port}`);
-    console.log(`[server] Demo login: sales@infinitylearn.com / demo1234`);
+    if (env.nodeEnv !== 'production') {
+      console.log('[server] Demo login: sales@infinitylearn.com (password: DEMO_USER_PASSWORD, default demo1234)');
+    }
   });
 }
 

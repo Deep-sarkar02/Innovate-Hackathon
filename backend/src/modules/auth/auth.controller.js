@@ -1,3 +1,4 @@
+import { env } from '../../config/env.js';
 import { User } from '../../models/User.js';
 import { signToken } from './auth.service.js';
 
@@ -45,12 +46,17 @@ export async function getMe(userId) {
 }
 
 export async function seedDemoUser() {
+  if (!env.seedDemoUsers) return User.findOne({ email: 'sales@infinitylearn.com' });
+  if (env.nodeEnv === 'production' && env.demoUserPassword === 'demo1234') {
+    console.warn('[auth] Refusing to seed demo users with the default password in production. Set DEMO_USER_PASSWORD.');
+    return User.findOne({ email: 'sales@infinitylearn.com' });
+  }
   const existing = await User.findOne({ email: 'sales@infinitylearn.com' });
   if (!existing) {
     await User.create({
       name: 'Demo Sales Executive',
       email: 'sales@infinitylearn.com',
-      password: 'demo1234',
+      password: env.demoUserPassword,
       role: 'sales_executive',
     });
   }
@@ -60,7 +66,7 @@ export async function seedDemoUser() {
     await User.create({
       name: 'Demo Admin',
       email: 'admin@infinitylearn.com',
-      password: 'demo1234',
+      password: env.demoUserPassword,
       role: 'admin',
     });
   }
