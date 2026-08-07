@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-900: #1e3a5f;
+}
+
+body {
+  font-family: var(--font-sans);
+  @apply bg-black text-slate-100 antialiased;
+}
+
+.lk-room-container {
+  height: 0 !important;
+  overflow: hidden;
+}
