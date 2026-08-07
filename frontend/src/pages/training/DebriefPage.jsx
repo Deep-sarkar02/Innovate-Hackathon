@@ -75,7 +75,17 @@ export default function DebriefPage() {
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <div className="bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-6">
-          <p className="text-indigo-400 text-xs uppercase tracking-wider mb-1">Objective</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-indigo-400 text-xs uppercase tracking-wider">Objective</p>
+            {debrief.evaluationMode === 'mock' && (
+              <span
+                className="text-[11px] px-2 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/10 text-amber-300"
+                title="The AI service was unavailable; these scores come from a deterministic keyword heuristic and carry low confidence."
+              >
+                HEURISTIC EVALUATION
+              </span>
+            )}
+          </div>
           <h2 className="text-2xl font-bold capitalize mb-4">{debrief.objective?.replace(/_/g, ' ')}</h2>
           <div className="flex items-center gap-6">
             <div>
@@ -101,7 +111,7 @@ export default function DebriefPage() {
             )}
             <div>
               <p className="text-slate-500 text-xs">Duration</p>
-              <p className="text-xl font-semibold">{debrief.durationMinutes ?? 0} min</p>
+              <p className="text-xl font-semibold">{(debrief.durationMinutes ?? 0) < 1 ? '<1 min' : `${debrief.durationMinutes} min`}</p>
             </div>
           </div>
         </div>

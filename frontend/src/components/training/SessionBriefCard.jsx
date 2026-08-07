@@ -10,7 +10,7 @@ export default function SessionBriefCard({ sessionBrief }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
         <div>
           <p className="text-slate-500 text-xs">Persona</p>
-          <p className="text-white capitalize">{sessionBrief.persona}</p>
+          <p className="text-white capitalize">{String(sessionBrief.persona ?? '').replace(/_/g, ' ')}</p>
         </div>
         <div>
           <p className="text-slate-500 text-xs">Mood</p>
@@ -22,7 +22,7 @@ export default function SessionBriefCard({ sessionBrief }) {
         </div>
         <div>
           <p className="text-slate-500 text-xs">Cohort</p>
-          <p className="text-white">{sessionBrief.cohortId} v{sessionBrief.cohortVersion}</p>
+          <p className="text-white capitalize">{String(sessionBrief.cohortId ?? '').replace(/_/g, ' ')} · v{sessionBrief.cohortVersion}</p>
         </div>
       </div>
       <p className="text-slate-400 text-sm mt-4">{sessionBrief.goal}</p>
