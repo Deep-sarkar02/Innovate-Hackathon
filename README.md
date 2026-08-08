@@ -1,120 +1,216 @@
-# Adaptive Sales Training Platform (Innovate Hackathon)
+# AI Sales Copilot — Adaptive Sales Training Platform
 
-An adaptive on-job-training simulator for edtech sales reps. A simulated
-customer (LLM) takes calls from a rep; an Observer scores the conversation
-against evidence; a Coach updates a per-rep skill graph; a Planner uses that
-graph to pick the next scenario. The loop is the product:
+An AI-powered sales training platform for Infinity Learn. Sales reps practice live customer conversations in realistic simulations, receive real-time coaching, and get post-session debriefs with skill insights. The stack combines a React frontend, Node.js API, MongoDB, Amazon Bedrock for LLM responses, Amazon Polly for voice output, and optional LiveKit for real-time meeting rooms.
+
+## Features
+
+- **Training simulations** — Configure persona, difficulty, product context, and language (English / Hindi), then run a live role-play session against an AI customer.
+- **Multi-agent AI** — Customer, coach, and observer agents powered by a unified LLM client (Bedrock first, OpenAI fallback).
+- **Speech I/O** — Browser Speech Recognition for input; Amazon Polly TTS via the backend with browser `speechSynthesis` fallback.
+- **Post-session debrief** — Session insights, skill scoring, and LMS recommendations.
+- **Rep profiles & skill graph** — Track progress across sales competencies.
+- **Admin analytics & cohorts** — Manage training cohorts and view aggregate performance.
+- **LiveKit integration** — Optional real-time audio rooms for legacy copilot / meeting mode.
+
+## Architecture
 
 ```
-LMS → Skill Graph → Training Planner → Customer Simulation → Observer → Coach → Skill Graph …
+Browser (React)
+  ├── Speech Recognition (STT)
+  ├── Polly TTS or browser speech (TTS)
+  └── REST API ──► Express backend
+                       ├── MongoDB
+                       ├── Bedrock Ministral (LLM)
+                       ├── Amazon Polly (TTS)
+                       ├── OpenAI (LLM fallback)
+                       └── LiveKit (optional rooms)
 ```
 
-## What makes this one different
+LiveKit handles optional audio rooms only. The AI brain runs through the backend REST API and Bedrock.
 
-**Everything is calibrated against real funnel data** — 6,233 real demo-booked
-calls, 761 closed sales, 57 transcribed winning calls:
+## Tech Stack
 
-- **Cohorts are real segments** (`backend/src/seed/cohorts.seed.js`), each with
-  its true volume, sale rate, objection mix and EMI share. The difficulty
-  ladder is the empirical sale-rate ordering, not a guess.
-- **The Observer scores only 12 "grounded" skills** — ones with observable
-  evidence and enough labelled outcomes to mean something. A skill without
-  evidence in the transcript is *omitted*, never invented. Every LLM score
-  must carry a verbatim quote.
-- **Objections use the real taxonomy**: financial_constraint (52%),
-  need_time (28%), trust_deficit (8%), family_consultation (7%),
-  competitor_locked (5%).
-- **Degradation is loud**: if OpenAI is unreachable, replies/scoring fall back
-  to a deterministic heuristic, every response carries `mode: 'mock'`, the UI
-  shows a SIMULATION MODE banner, and `/health` reports the last AI error.
+| Layer    | Technologies |
+|----------|--------------|
+| Frontend | React 19, Vite, Tailwind CSS, React Router, LiveKit Components |
+| Backend  | Node.js, Express, Mongoose, JWT |
+| Database | MongoDB |
+| AI       | Amazon Bedrock (Ministral 3 8B), OpenAI (fallback) |
+| Voice    | Amazon Polly (TTS), Web Speech API (STT + TTS fallback) |
+| Realtime | LiveKit Cloud (optional) |
 
-## Quick start
+## Prerequisites
+
+- Node.js 18+
+- MongoDB (local or Atlas)
+- Amazon Bedrock API key (for LLM)
+- AWS IAM credentials with Polly access (optional, for server-side TTS)
+- OpenAI API key (optional fallback)
+- LiveKit Cloud project (optional, for meeting rooms)
+
+## Quick Start
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/Deep-sarkar02/Innovate-Hackathon.git
+cd Innovate-Hackathon
 npm run install:all
-docker compose up -d          # MongoDB on 27017
-cp .env.example .env          # add real keys for LLM + voice (optional to boot)
-npm run dev                   # backend :4000, frontend :5173
-# demo login: sales@infinitylearn.com / demo1234  (override: DEMO_USER_PASSWORD)
 ```
 
-Backend tests (no DB needed): `cd backend && npm test`
+### 2. Configure environment
 
-## Environment
+Copy the example env file and fill in your values:
 
-| Var | Required | Notes |
-| --- | --- | --- |
-| `MONGODB_URI` | yes (defaults to localhost) | |
-| `JWT_SECRET` | yes | 32+ chars |
-| `OPENAI_API_KEY` | for real AI | without it the app runs in loud mock mode |
-| `LIVEKIT_URL/API_KEY/API_SECRET` | for live voice | text training works without |
-| `DEEPGRAM_API_KEY` | for STT | |
-| `DEMO_USER_PASSWORD` | prod | seeding demo users with the default pw is refused in production |
-| `SEED_DEMO_USERS` | optional | `false` disables demo accounts |
-
-## Architecture / agent contracts (frozen — coordinate before changing)
-
-Three agents, three jobs — they never overlap:
-
-| Agent | Does | Never |
-| --- | --- | --- |
-| Customer (`agents/customer.agent.js`) | talks in persona | evaluates or coaches |
-| Observer (`agents/observer.agent.js`) | scores with evidence | talks |
-| Coach (`agents/coach.agent.js`) | updates skill graph, feedback, LMS recs | joins the conversation |
-
-**SessionBrief** (Planner → Customer/Observer):
-```json
-{
-  "objective": "pricing", "difficulty": {"knowledge":1-5, "...":"..."},
-  "persona": "father|mother|both_parents|student", "mood": "skeptical|neutral|interested|frustrated",
-  "primaryObjection": "financial_constraint|need_time|trust_deficit|family_consultation|competitor_locked",
-  "goal": "…", "cohortId": "east_belt_middle", "cohortVersion": 1,
-  "customerName": "…", "language": "en|hi", "city": "…", "region": "…"
-}
+```bash
+cp .env.example .env
 ```
 
-**Observer output** (Observer → Coach):
-```json
-{
-  "mode": "llm|mock", "scores": {"<groundedSkillId>": 0-100},
-  "evidenceQuotes": {"<skillId>": "verbatim quote"},
-  "scoredSkills": [], "unscoredSkills": [],
-  "mistakes": [], "highlights": [], "keyQuotes": [],
-  "confidence": 0-100, "overallScore": "0-100 or null"
-}
+See [Environment variables](#environment-variables) below for details.
+
+### 3. Start MongoDB
+
+Ensure MongoDB is running locally, or set `MONGODB_URI` to your Atlas connection string.
+
+### 4. Run the app
+
+```bash
+npm run dev
 ```
 
-**Turn response** (`POST /training/:id/transcript`) additionally carries
-`aiMode: 'llm'|'mock'`.
+This starts both services concurrently:
 
-Guard-rails in the loop (don't remove):
-- Per-session skill delta cap: ±8 (one session = one data point)
-- Deltas scale with observer confidence (mock ≈ quarter weight)
-- Unscored skills never move
-- Diminishing returns on repeated keywords in customer state (anti-gaming)
+- **Backend API** — `http://localhost:4000`
+- **Frontend** — `http://localhost:5173`
 
-## CRT Course (drip-gated learning)
+### 5. Log in
 
-`/course/crt` is a 5-day Counsellor Readiness Training course seeded from the
-real CRT schedule. Gating is SERVER-side (`modules/courses/course.service.js`):
-slides advance one page at a time, checkpoint quizzes mid-deck block later
-pages until passed, each day ends with a final quiz, and day N+1 stays locked
-until day N is fully complete. Content lives in `seed/crt-course.seed.js`.
+Use the seeded demo account:
 
-## Team split (suggested)
+| Field    | Value |
+|----------|-------|
+| Email    | `sales@infinitylearn.com` |
+| Password | `demo1234` |
 
-| Owner | Area | Files |
-| --- | --- | --- |
-| A | Simulation & voice | `agent/`, `modules/livekit,simulation`, `components/voice,livekit` |
-| B | Evaluation | `modules/agents/observer,coach`, `modules/coaching` |
-| C | Planner & data | `modules/training-planner,cohort-kb`, `seed/`, `modules/lms-recommend` |
-| D | Frontend & analytics | `frontend/src/pages`, `components/training`, `modules/analytics` |
+## Environment Variables
 
-Branch per person, PR into `main`. Conflict magnets with one owner each:
-`routes/index.js` (A), `seed/index.js` (C), `.env.example` (C).
+All configuration lives in a root `.env` file (never commit this file).
 
-## Data provenance
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MONGODB_URI` | Yes | MongoDB connection string |
+| `JWT_SECRET` | Yes | Secret for signing JWT tokens (32+ chars in production) |
+| `BEDROCK_API_KEY` | For AI | Short-lived Bedrock console key (`bedrock-api-key-...`) |
+| `AWS_REGION` | For AI | Bedrock region (default: `us-west-2`) |
+| `BEDROCK_MODEL` | For AI | Model ID (default: `mistral.ministral-3-8b-instruct`) |
+| `AWS_ACCESS_KEY_ID` | For Polly | IAM access key (or temporary STS key) |
+| `AWS_SECRET_ACCESS_KEY` | For Polly | IAM secret key |
+| `AWS_SESSION_TOKEN` | For Polly | STS session token (if using temporary creds) |
+| `OPENAI_API_KEY` | Optional | Fallback LLM when Bedrock is unavailable |
+| `LIVEKIT_URL` | Optional | LiveKit WebSocket URL |
+| `LIVEKIT_API_KEY` | Optional | LiveKit API key |
+| `LIVEKIT_API_SECRET` | Optional | LiveKit API secret |
+| `VITE_API_URL` | Yes | Frontend API base URL (default: `http://localhost:4000/api/v1`) |
+| `VITE_LIVEKIT_URL` | Optional | LiveKit URL exposed to the frontend |
+| `CORS_ORIGIN` | Yes | Allowed frontend origin (default: `http://localhost:5173`) |
 
-Seeds cite the analysis they came from (see header of `cohorts.seed.js`).
-If you change a cohort, bump its `version` — session insights reference
-`cohortId+cohortVersion`, and old evaluations must stay interpretable.
+### AI provider priority
+
+1. **Amazon Bedrock** — Used when `BEDROCK_API_KEY` is set. Calls the OpenAI-compatible Bedrock Mantle endpoint.
+2. **OpenAI** — Used when Bedrock is not configured or returns no result.
+3. **Mock responses** — Agents fall back to canned replies when no LLM is configured.
+
+### TTS provider priority
+
+1. **Amazon Polly** — Used when IAM credentials (`AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`) are set.
+2. **Browser speech** — Falls back to the Web Speech API when Polly is unavailable.
+
+> **Note:** The Bedrock API key and IAM credentials are separate. The Bedrock console key works for chat completions only; Polly requires standard AWS IAM credentials.
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start backend + frontend |
+| `npm run dev:backend` | Backend only |
+| `npm run dev:frontend` | Frontend only |
+| `npm run build` | Build frontend for production |
+| `npm run install:all` | Install root, backend, and frontend dependencies |
+
+### Test Bedrock connection
+
+```bash
+python scripts/test_bedrock_haiku.py
+```
+
+Lists available models:
+
+```bash
+python scripts/test_bedrock_openai.py
+```
+
+## API Overview
+
+Base URL: `http://localhost:4000/api/v1`
+
+| Route prefix | Purpose |
+|--------------|---------|
+| `/auth` | Login, registration, JWT |
+| `/training` | Session planner and simulation |
+| `/rep` | Rep profiles |
+| `/skills` | Skill graph |
+| `/cohorts` | Cohort knowledge base |
+| `/analytics` | Admin analytics |
+| `/lms` | LMS module recommendations |
+| `/tts` | Text-to-speech (`POST /speak`, `GET /status`) |
+| `/livekit` | LiveKit token generation |
+| `/ai` | Meeting copilot endpoints |
+
+## Project Structure
+
+```
+├── backend/
+│   └── src/
+│       ├── config/          # Env, DB, demo user
+│       ├── models/          # Mongoose schemas
+│       ├── modules/
+│       │   ├── agents/      # Customer, coach, observer + LLM clients
+│       │   ├── ai/          # Meeting copilot
+│       │   ├── simulation/  # Training session logic
+│       │   ├── tts/         # Amazon Polly TTS
+│       │   └── ...
+│       ├── routes/          # Route aggregator
+│       └── seed/            # Demo data
+├── frontend/
+│   └── src/
+│       ├── pages/           # Dashboard, training, admin, meeting
+│       ├── components/      # UI, LiveKit, voice
+│       ├── hooks/           # Speech recognition, TTS, session
+│       └── services/        # API client
+├── scripts/                 # Bedrock test utilities
+├── .env.example             # Environment template
+└── package.json             # Root workspace scripts
+```
+
+## App Routes
+
+| Path | Description |
+|------|-------------|
+| `/login` | Authentication |
+| `/dashboard` | Rep home |
+| `/train` | Configure a training session |
+| `/train/:sessionId` | Live simulation |
+| `/train/:sessionId/debrief` | Post-session review |
+| `/profile` | Rep skill profile |
+| `/admin/analytics` | Admin dashboard |
+| `/admin/cohorts` | Cohort management |
+| `/copilot` | Legacy meeting setup |
+| `/meeting/:meetingId` | LiveKit meeting room |
+
+## Branch
+
+Active development: **`dev/deep`** — Bedrock Ministral LLM + Amazon Polly TTS integration.
+
+## License
+
+Private — Infinity Learn Deep Innovate Hackathon project.
