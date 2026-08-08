@@ -1,0 +1,125 @@
+{
+  "$schema_version": "1.0",
+  "name": "Observer AI — Lengthy Loss Autopsy",
+  "purpose": "Audit calls that went LONG and still lost. A 60-second refusal failed at the opening; a 10-minute 'Not Interested' failed somewhere in the middle or at the close. This rubric finds WHERE the call turned, not whether the rep showed up.",
+  "when_to_use": "Apply to any call >= 5 minutes whose lead stage is Not Interested / Disqualified. For short losses use the cold-open rubric in observer-audit.json instead — the failure modes barely overlap.",
+
+  "grounded_on": {
+    "corpus": "1,599 not-conducted recordings (Aug 2026 LSQ export), 90% 'Not Interested'",
+    "duration_distribution": {
+      "under_30s": 0.224,
+      "30_to_60s": 0.252,
+      "1_to_3min": 0.327,
+      "3_to_5min": 0.075,
+      "5_to_10min": 0.086,
+      "over_10min": 0.036,
+      "lengthy_5min_plus_count": 195,
+      "lengthy_median_seconds": 490
+    },
+    "the_finding_that_defines_this_rubric": {
+      "claim": "Lengthy losses are NOT shorter, quieter or less engaged than winning calls. They are often LONGER and wordier.",
+      "evidence": "Transcribed lengthy losses ran 358-793s with 945-1,400 words; the moderate WINNING baseline is ~546s and ~970 words. One loss ran 13 minutes across 766 turns with 48 customer questions — high engagement, still lost.",
+      "implication": "Effort, duration and rapport were all present. The failure is QUALITATIVE — what was said, in what order, and what was never asked for. Do not score these calls on activity.",
+      "caveat": "Only 4 lengthy losses were transcribed when this rubric was written (195 exist by duration). Structural comparisons are directional; the failure-mode list below should be re-weighted once the full set is transcribed."
+    }
+  },
+
+  "observer_prompt": "You are the Observer AI performing an AUTOPSY on a long sales call that ended in 'Not Interested'. The rep got time, attention and engagement — and still lost. Your job is to find the TURNING POINT and name what was missing. You SCORE ONLY; you never write customer dialogue and never coach in first person.\n\nFRAMING — read this before you judge anything:\nThis call was not lost through lack of effort. In this corpus, lengthy losses run LONGER and wordier than winning calls (358-793 seconds, 945-1,400 words, against a winning baseline of ~546 seconds and ~970 words). One lost call ran 13 minutes over 766 turns with 48 customer questions. So never write 'the rep should have spent more time' or 'built more rapport' — that is contradicted by the data and it is useless coaching. Ask instead: given all this time, what did the rep never do?\n\nEVIDENCE RULES\n1. Every finding cites a verbatim quote and timestamp. If you cannot evidence it, mark it 'not_evidenced' — never infer a failure from the outcome alone.\n2. The transcript is Hinglish and the ASR mangles words. Judge intent when the intent is clear and set confidence='low'; do not penalise the rep for an ASR artefact.\n3. Outcome does not prove process. A 'Not Interested' lead may have been genuinely unqualified — say so plainly if the transcript shows it, and score the rep on what was controllable.\n\nSTEP 1 — LOCATE THE TURNING POINT\nRead the call as an arc and identify the single moment where it became unwinnable. Report its timestamp, the quote, and which phase it happened in. Classify it as one of:\n  · never_turned — the customer was never actually engaged; the length was the rep talking\n  · lost_at_discovery — questions were asked but the answers were never used\n  · lost_at_value — the pitch never connected to what the parent said they cared about\n  · lost_at_price — the number landed wrong (annual, unframed, or too early)\n  · lost_at_objection — a real objection was countered instead of explored\n  · lost_at_close — value was built and then never converted into an ask\n  · lost_after_yes — the customer was ready and the rep kept selling past it\n  · genuinely_unqualified — no product fit existed; the loss was correct\n\nSTEP 2 — TEST THE LATE-CALL FAILURE MODES\nFor each, decide occurred / not_occurred / not_evidenced with evidence:\n  1. DIAGNOSED BUT NEVER PRESCRIBED — the rep gathered plenty about the child but never converted it into a specific recommendation tied to that child.\n  2. FEATURES NOT OUTCOMES — described classes, app, faculty, structure, but never what changes for THIS child.\n  3. PRICE WITHOUT EMI — an annual number given with no monthly translation (75.6% of real closed deals are financed).\n  4. PRICE TOO EARLY — commercials raised before value existed. In winning calls price appears in only 26% of first calls, and discount lands late (~66% through).\n  5. DISCOUNT AS AN OPENER — scholarship offered to rescue a wobble rather than as a closing lever.\n  6. OBJECTION COUNTERED, NOT EXPLORED — the rep answered 'we'll think about it' with a rebuttal instead of finding out what specifically they wanted to think about.\n  7. NO ASK — the call ended without a concrete demo slot ever being proposed. Offering 'shall I call later' is not an ask.\n  8. OPEN-ENDED SCHEDULING — 'what time suits you?' instead of proposing two concrete slots.\n  9. ONE DECISION-MAKER ONLY — the spouse was mentioned as a blocker but never invited to the demo.\n  10. MONOLOGUE BLOCKS — long uninterrupted rep stretches with no comprehension check.\n  11. TALKED PAST THE YES — the customer signalled agreement and the rep continued pitching, reopening doubt.\n  12. NO NEXT STEP — the call ended with no follow-up date, no WhatsApp confirmation, nothing owned by the rep.\n\nSTEP 3 — COMPUTE STRUCTURE (numbers, not adjectives)\n  · customer_talk_share (corpus median 35%; below 25% means the rep filled the time)\n  · longest_agent_monologue_turns (median 8, worst observed 85)\n  · agent_question_count and how many came AFTER the pitch began (late questions signal a script, not discovery)\n  · comprehension_checks ('samajh aaya?', 'theek hai?')\n  · discount_position_pct and price_position_pct (fraction into the call)\n  · time_to_first_ask_pct — where the first concrete demo proposal appears, or null if never\n  · customer_engagement_curve — describe in one line whether the customer's participation rose, held or collapsed, and roughly when\n\nSTEP 4 — THE COUNTERFACTUAL\nName the ONE change most likely to have flipped this call, phrased as a concrete line the rep could have said at a specific moment. Not 'build more rapport' — something sayable, at a timestamp.\n\nOUTPUT\nReturn ONLY JSON matching output_schema. Write observations in the Training Manager's house style: '#m:ss - what happened' and '#m:ss - what should have happened instead'. Be specific and unsparing; a rep will read this.",
+
+  "output_schema": {
+    "type": "object",
+    "required": ["call_summary", "turning_point", "failure_modes", "structural_metrics", "counterfactual", "verdict"],
+    "properties": {
+      "call_summary": {
+        "type": "object",
+        "properties": {
+          "duration_minutes": { "type": "number" },
+          "who_was_on_call": { "type": "string", "enum": ["father", "mother", "both_parents", "student", "other", "unclear"] },
+          "customer_engagement": { "type": "string", "enum": ["high", "moderate", "low", "collapsed_midway"] },
+          "reached_phases": { "type": "array", "items": { "type": "string", "enum": ["introduction", "rapport_building", "need_generation", "session_pitching", "closing"] } },
+          "deepest_phase_reached": { "type": "string" }
+        }
+      },
+      "turning_point": {
+        "type": "object",
+        "required": ["classification", "timestamp", "quote", "explanation"],
+        "properties": {
+          "classification": { "type": "string", "enum": ["never_turned", "lost_at_discovery", "lost_at_value", "lost_at_price", "lost_at_objection", "lost_at_close", "lost_after_yes", "genuinely_unqualified"] },
+          "timestamp": { "type": "string" },
+          "quote": { "type": "string" },
+          "phase": { "type": "string" },
+          "explanation": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
+        }
+      },
+      "failure_modes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["diagnosed_never_prescribed", "features_not_outcomes", "price_without_emi", "price_too_early", "discount_as_opener", "objection_countered_not_explored", "no_ask", "open_ended_scheduling", "one_decision_maker_only", "monologue_blocks", "talked_past_the_yes", "no_next_step"] },
+            "status": { "type": "string", "enum": ["occurred", "not_occurred", "not_evidenced"] },
+            "timestamp": { "type": "string" },
+            "quote": { "type": "string" },
+            "severity": { "type": "string", "enum": ["critical", "major", "minor"] }
+          }
+        }
+      },
+      "structural_metrics": {
+        "type": "object",
+        "properties": {
+          "customer_talk_share": { "type": "number" },
+          "longest_agent_monologue_turns": { "type": "integer" },
+          "agent_question_count": { "type": "integer" },
+          "questions_after_pitch_began": { "type": "integer" },
+          "comprehension_checks": { "type": "integer" },
+          "price_position_pct": { "type": ["number", "null"] },
+          "discount_position_pct": { "type": ["number", "null"] },
+          "time_to_first_ask_pct": { "type": ["number", "null"] },
+          "customer_engagement_curve": { "type": "string" }
+        }
+      },
+      "counterfactual": {
+        "type": "object",
+        "properties": {
+          "at_timestamp": { "type": "string" },
+          "instead_of": { "type": "string" },
+          "should_have_said": { "type": "string" },
+          "why_it_would_have_worked": { "type": "string" }
+        }
+      },
+      "verdict": {
+        "type": "object",
+        "properties": {
+          "controllable_loss": { "type": "boolean", "description": "true if a better call would plausibly have won it; false if genuinely unqualified" },
+          "process_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "one_line_summary": { "type": "string" }
+        }
+      }
+    }
+  },
+
+  "coaching_notes": {
+    "do_not_say": [
+      "'Spend more time on the call' — lengthy losses already run longer than wins.",
+      "'Build more rapport' — unless the metrics show engagement actually collapsed.",
+      "'Be more enthusiastic' — unmeasurable and not actionable."
+    ],
+    "do_say": [
+      "Name the timestamp where the call turned and what should have been said there.",
+      "Point at the ask that never happened — 'no concrete slot was ever proposed' is the most common late-call failure.",
+      "Convert diagnosis into prescription: quote what the parent said about the child, then what the rep should have recommended because of it."
+    ]
+  },
+
+  "analysis_backlog": {
+    "note": "Run these once the full 1,599 negative-class set is transcribed.",
+    "items": [
+      "Score all 195 lengthy losses and rank turning_point classifications by frequency — that ranking becomes the coaching curriculum.",
+      "Compare structural_metrics of lengthy losses against the 171 winning transcripts; any metric that separates them cleanly is a candidate KPI.",
+      "Check whether lengthy losses cluster by rep (a process problem) or spread evenly (a script problem).",
+      "Validate: the Observer should score winning calls higher than lengthy losses. If it cannot, the rubric is wrong, not the reps.",
+      "Split 'genuinely_unqualified' out of the loss pool before computing any rep-level score."
+    ]
+  }
+}
