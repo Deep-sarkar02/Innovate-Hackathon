@@ -4,6 +4,11 @@ import { UserSkillProgress } from '../../models/UserSkillProgress.js';
 import { getWeakestSkills } from '../skill-graph/skill-graph.service.js';
 import { getOrCreateRepProfile } from '../rep-profile/rep-profile.service.js';
 import { COHORT_LADDER } from '../../seed/cohorts.seed.js';
+import {
+  buildSessionBriefFromProfile,
+  getCustomerProfile,
+  getDefaultProfile,
+} from '../customer-profiles/customer-profiles.service.js';
 
 const SKILL_THRESHOLD = 60;
 const MAX_FAILURES_BEFORE_ROTATE = 5;
@@ -136,25 +141,36 @@ function pickMood(difficulty) {
   return 'interested';
 }
 
-export async function generateSessionBrief(repId) {
-  const profile = await getOrCreateRepProfile(repId);
+export async function generateSessionBrief(repId, options = {}) {
+  const repProfile = await getOrCreateRepProfile(repId);
   const weakestSkills = await getWeakestSkills(repId, 10);
   const progressRecords = await UserSkillProgress.find({ userId: repId }).lean();
 
   const quizOutcomes = {};
-  if (profile.quizOutcomes) {
-    for (const [key, val] of profile.quizOutcomes.entries?.() ?? Object.entries(profile.quizOutcomes)) {
+  if (repProfile.quizOutcomes) {
+    for (const [key, val] of repProfile.quizOutcomes.entries?.() ?? Object.entries(repProfile.quizOutcomes)) {
       quizOutcomes[key] = val;
     }
   }
 
-  // Cohort: explicit assignment wins; otherwise place the rep on the
-  // empirical difficulty ladder by their average grounded-skill score.
+  const objective = pickObjective(weakestSkills, quizOutcomes, progressRecords);
+  const goal = GOAL_TEMPLATES[objective] ?? `Can rep demonstrate proficiency in ${objective}?`;
+  const language = options.language ?? repProfile.language ?? 'en';
+
+  const customerProfile = options.profileId
+    ? getCustomerProfile(options.profileId)
+    : getDefaultProfile();
+
+  if (customerProfile) {
+    return buildSessionBriefFromProfile(customerProfile, { objective, goal, language });
+  }
+
+  // Fallback: legacy auto-generated brief (no profile sheet)
   const allScores = weakestSkills.map((s) => s.score);
   const avgSkill = allScores.length
     ? allScores.reduce((a, b) => a + b, 0) / allScores.length
     : null;
-  const assigned = profile.cohortAssignments?.[0];
+  const assigned = repProfile.cohortAssignments?.[0];
   const cohortKey = assigned ?? pickCohortForLevel(avgSkill);
   const [cohortId, versionStr] = cohortKey.includes('_v')
     ? [cohortKey.replace(/_v\d+$/, ''), parseInt(cohortKey.match(/_v(\d+)$/)?.[1] ?? '1', 10)]
@@ -166,13 +182,10 @@ export async function generateSessionBrief(repId) {
     ?? await Cohort.findOne({ cohortId, isActive: true }).sort({ version: -1 }).lean()
     ?? await Cohort.findOne({ isActive: true }).sort({ cohortId: 1, version: -1 }).lean();
 
-  const objective = pickObjective(weakestSkills, quizOutcomes, progressRecords);
   const targetSkill = weakestSkills.find((s) => s.skillId === objective) ?? weakestSkills[0];
   const difficulty = computeDifficulty(objective, targetSkill?.score ?? 50, cohort?.difficultyPresets);
   const persona = pickPersona(objective, cohort ?? { personas: ['father'] });
   const mood = pickMood(difficulty);
-  // Prefer the cohort's own objection mix when the objective has no strong
-  // mapping — cohorts carry the REAL per-segment distributions.
   const primaryObjection = OBJECTION_MAP[objective]
     ?? cohort?.commonObjections?.[0]
     ?? 'financial_constraint';
@@ -183,21 +196,21 @@ export async function generateSessionBrief(repId) {
     persona,
     mood,
     primaryObjection,
-    goal: GOAL_TEMPLATES[objective] ?? `Can rep demonstrate proficiency in ${objective}?`,
+    goal,
     cohortId: cohort?.cohortId ?? cohortId,
     cohortVersion: cohort?.version ?? versionStr ?? 1,
     customerName:
       persona === 'student' ? 'Rahul'
         : persona === 'both_parents' ? 'Mr. & Mrs. Sharma'
           : persona === 'mother' ? 'Mrs. Sharma' : 'Mr. Sharma',
-    language: profile.language ?? 'en',
-    city: profile.city ?? 'Hyderabad',
-    region: profile.region ?? 'South',
+    language,
+    city: repProfile.city ?? 'Hyderabad',
+    region: repProfile.region ?? 'South',
   };
 }
 
-export async function previewPlan(repId) {
-  const brief = await generateSessionBrief(repId);
+export async function previewPlan(repId, options = {}) {
+  const brief = await generateSessionBrief(repId, options);
   const profile = await getOrCreateRepProfile(repId);
   const weakestSkills = await getWeakestSkills(repId, 5);
 

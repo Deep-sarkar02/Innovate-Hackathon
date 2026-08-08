@@ -2,7 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { TrainingSession } from '../../models/TrainingSession.js';
 import { SessionInsight } from '../../models/SessionInsight.js';
 import { generateSessionBrief } from '../training-planner/planner.service.js';
-import { generateCustomerReply, updateCustomerState } from '../agents/customer.agent.js';
+import { initialStateFromProfile } from '../customer-profiles/customer-profiles.service.js';
+import { COLD_CALL_OPENING } from '../customer-profiles/customer-instructor.js';
+import { generateCustomerReply, updateCustomerState, applyCustomerReplyStateEffects, computeStateDeltas, snapshotCustomerState, advanceConversationState } from '../agents/customer.agent.js';
+import { resolveVoiceGender } from '../customer-profiles/customer-profiles.service.js';
 import { observeSession } from '../agents/observer.agent.js';
 import { coachSession } from '../agents/coach.agent.js';
 import { getSkillGraphForUser } from '../skill-graph/skill-graph.service.js';
@@ -12,16 +15,24 @@ import { AccessToken } from 'livekit-server-sdk';
 const TRANSCRIPT_TTL_HOURS = 24;
 
 function initialCustomerState(sessionBrief) {
+  if (sessionBrief.stateSeed || sessionBrief.profileId) {
+    return initialStateFromProfile(sessionBrief);
+  }
+
   const d = sessionBrief.difficulty ?? {};
   return {
     belief: 50,
-    trust: Math.max(0, 40 - (d.emotion ?? 0) * 5),
+    trust: Math.max(25, 45 - (d.emotion ?? 0) * 5),
     urgency: Math.min(100, 30 + (d.timePressure ?? 0) * 8),
-    financialComfort: Math.max(0, 30 - (d.budget ?? 0) * 8),
+    financialComfort: Math.max(15, 35 - (d.budget ?? 0) * 8),
     emotionalConfidence: 50,
-    academicAnxiety: Math.min(100, 60 + (d.emotion ?? 0) * 5),
-    competitorAffinity: Math.min(100, 40 + (d.competitorLoyalty ?? 0) * 10),
-    decisionReadiness: Math.min(100, 20 + (d.decisionAuthority ?? 0) * 5),
+    academicAnxiety: Math.min(85, 55 + (d.emotion ?? 0) * 5),
+    competitorAffinity: Math.min(85, 35 + (d.competitorLoyalty ?? 0) * 10),
+    decisionReadiness: Math.min(100, 25 + (d.decisionAuthority ?? 0) * 5),
+    mentionedTopics: [],
+    objectionsRaised: [],
+    conversationPhase: 'cold_open',
+    turnCount: 0,
   };
 }
 
@@ -38,13 +49,24 @@ async function createLiveKitToken(roomId, identity, name) {
 }
 
 export async function startTrainingSession(repId, options = {}) {
-  const sessionBrief = options.sessionBrief ?? (await generateSessionBrief(repId));
+  const sessionBrief = options.sessionBrief ?? (await generateSessionBrief(repId, {
+    profileId: options.profileId,
+    language: options.language,
+  }));
   const language = options.language ?? sessionBrief.language ?? 'en';
   sessionBrief.language = language;
+  const voiceGender = sessionBrief.voiceGender ?? resolveVoiceGender(sessionBrief) ?? options.voiceGender ?? 'female';
   const roomId = `train-${uuidv4().slice(0, 8)}`;
 
   const expires = new Date();
   expires.setHours(expires.getHours() + TRANSCRIPT_TTL_HOURS);
+
+  const openingLine = sessionBrief.openingLine ?? COLD_CALL_OPENING;
+  const initialTranscript = [{
+    speaker: 'customer',
+    text: openingLine,
+    timestamp: new Date(),
+  }];
 
   const session = await TrainingSession.create({
     repId,
@@ -54,11 +76,11 @@ export async function startTrainingSession(repId, options = {}) {
     sessionBrief,
     customerState: initialCustomerState(sessionBrief),
     language,
-    voiceGender: options.voiceGender ?? 'female',
+    voiceGender,
     voicePersona: options.voicePersona ?? 'arbor',
     startTime: new Date(),
     transcriptExpiresAt: expires,
-    transcript: [],
+    transcript: initialTranscript,
   });
 
   const salesToken = await createLiveKitToken(roomId, `rep-${repId}`, 'Sales Rep');
@@ -69,6 +91,7 @@ export async function startTrainingSession(repId, options = {}) {
     roomId,
     sessionBrief,
     customerState: session.customerState,
+    openingLine,
     tokens: { salesToken, customerToken },
     livekitUrl: env.livekit?.url,
   };
@@ -87,16 +110,37 @@ export async function appendTrainingTurn(sessionId, { speaker, text }) {
   let customerReply = null;
   let aiMode = null;
   if (speaker === 'sales_executive') {
-    // State is updated exactly ONCE per rep turn, here. (The old mock reply
-    // also mutated state internally, double-applying every effect.)
+    const before = snapshotCustomerState(session.customerState);
+
     session.customerState = updateCustomerState(session.customerState, text, session.sessionBrief);
     session.markModified('customerState');
+
     const reply = await generateCustomerReply(session, text);
     if (reply?.text) {
       aiMode = reply.mode;
       customerReply = { speaker: 'customer', text: reply.text, timestamp: new Date() };
       session.transcript.push(customerReply);
+      session.customerState = applyCustomerReplyStateEffects(session.customerState, reply.text);
+      session.customerState = advanceConversationState(
+        session.customerState,
+        text,
+        session.sessionBrief,
+        reply.text,
+      );
+      session.markModified('customerState');
     }
+
+    const stateDeltas = computeStateDeltas(before, session.customerState);
+
+    await session.save();
+
+    return {
+      transcript: session.transcript,
+      customerReply,
+      customerState: session.toObject().customerState,
+      stateDeltas,
+      aiMode,
+    };
   }
 
   await session.save();
@@ -104,9 +148,8 @@ export async function appendTrainingTurn(sessionId, { speaker, text }) {
   return {
     transcript: session.transcript,
     customerReply,
-    customerState: session.customerState,
-    // 'llm' | 'mock' — lets the UI show a SIMULATION MODE badge instead of
-    // silently presenting canned replies as AI.
+    customerState: session.toObject().customerState,
+    stateDeltas: {},
     aiMode,
   };
 }

@@ -243,6 +243,58 @@ export const KNOWLEDGE_NODES = [
   // Shared counters observed in real winning calls (attached to every cohort)
   ...COHORTS.flatMap((c) => [
     {
+      nodeId: `${c.cohortId}_v1_customer_background`,
+      type: 'customer_fact',
+      label: 'Why you are on this call',
+      content:
+        'Your child recently took an aptitude/diagnostic test at their school, arranged by Infinity Learn. '
+        + 'You shared your phone number and expect a callback about the results. This is that call. '
+        + 'You have NOT been told exact package prices yet unless the rep just mentioned them.',
+      cohortId: c.cohortId,
+      cohortVersion: 1,
+      tags: ['background', 'opening'],
+      relatedSkills: ['greeting', 'need_discovery'],
+    },
+    {
+      nodeId: `${c.cohortId}_v1_customer_product`,
+      type: 'customer_fact',
+      label: 'What you know about Infinity Learn',
+      content:
+        'You vaguely know Infinity Learn is an online coaching platform (live classes, tests, mentorship) '
+        + 'linked to the Sri Chaitanya name. Programs include Foundation/Aptitude tracks for school children. '
+        + 'You do not know package names (Regular, Ultimate, Multi-Year) or exact fees until the rep explains. '
+        + 'If the rep mentions a demo, you expect it on Google Meet and may need to check your calendar.',
+      cohortId: c.cohortId,
+      cohortVersion: 1,
+      tags: ['product', 'trust'],
+      relatedSkills: ['trust_building', 'demo_pitch', 'value_proposition'],
+    },
+    {
+      nodeId: `${c.cohortId}_v1_customer_budget`,
+      type: 'customer_fact',
+      label: 'Your money mindset',
+      content:
+        `Programs like this are typically pitched around Rs ${c.meta?.avgPricePitched ?? 10000} per year in your segment — `
+        + 'that feels high compared to school fees. You think in monthly EMI (₹/month), not lump sum. '
+        + 'You may have heard of Bajaj EMI, credit-card EMI, or Fibe only if the rep mentions them. '
+        + 'Scholarships/discounts exist in your mind but you expect proof before believing them.',
+      cohortId: c.cohortId,
+      cohortVersion: 1,
+      tags: ['financial_constraint', 'emi', 'pricing'],
+      relatedSkills: ['pricing', 'emi_plans', 'scholarship'],
+    },
+    {
+      nodeId: `${c.cohortId}_v1_customer_segment`,
+      type: 'customer_fact',
+      label: 'Your family situation',
+      content: `${c.description} You live in ${c.cohortId.includes('east') ? 'eastern India (WB/Bihar/Odisha belt)' : 'India'}. `
+        + 'Big education spends are discussed with your spouse — you rarely commit on the first call alone.',
+      cohortId: c.cohortId,
+      cohortVersion: 1,
+      tags: ['segment', 'family_consultation'],
+      relatedSkills: ['need_discovery', 'closing'],
+    },
+    {
       nodeId: `${c.cohortId}_v1_counter_emi`,
       type: 'counter',
       label: 'EMI translation',

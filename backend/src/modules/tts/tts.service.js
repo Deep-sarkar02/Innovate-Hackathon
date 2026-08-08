@@ -1,10 +1,8 @@
 import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 import { env, isPollyConfigured } from '../../config/env.js';
-
-const VOICES = {
-  en: { female: 'Joanna', male: 'Matthew' },
-  hi: { female: 'Kajal', male: 'Kajal' },
-};
+import { sanitizeForSpeech } from '../../utils/speechText.js';
+import { listPollyVoices, resolvePollyVoice } from './polly.voices.js';
+import { textToSsml } from './ssml.js';
 
 let client;
 if (isPollyConfigured()) {
@@ -22,20 +20,27 @@ export function getTtsProvider() {
   return isPollyConfigured() ? 'polly' : 'browser';
 }
 
-export async function synthesizeSpeech(text, { language = 'en', voiceGender = 'female' } = {}) {
-  if (!client || !text?.trim()) return null;
+export function getTtsVoiceCatalog() {
+  return listPollyVoices();
+}
 
-  const lang = language === 'hi' ? 'hi' : 'en';
-  const voiceId = VOICES[lang]?.[voiceGender] ?? VOICES.en.female;
+export async function synthesizeSpeech(text, { language = 'en', voiceGender = 'female', persona = 'father' } = {}) {
+  const spoken = sanitizeForSpeech(text);
+  if (!client || !spoken) return null;
+
+  const voice = resolvePollyVoice(language, voiceGender, persona);
+  const ssml = textToSsml(spoken, { voiceGender, persona, language });
+  const useSsml = voice.engine === 'standard' && ssml.length > 0;
 
   try {
     const response = await client.send(
       new SynthesizeSpeechCommand({
-        Text: text.trim(),
+        Text: useSsml ? ssml : spoken,
+        TextType: useSsml ? 'ssml' : 'text',
         OutputFormat: 'mp3',
-        VoiceId: voiceId,
-        Engine: voiceId === 'Kajal' || voiceId === 'Joanna' || voiceId === 'Matthew' ? 'neural' : 'standard',
-        ...(lang === 'hi' ? { LanguageCode: 'hi-IN' } : { LanguageCode: 'en-US' }),
+        VoiceId: voice.voiceId,
+        Engine: voice.engine,
+        LanguageCode: voice.languageCode,
       })
     );
 
@@ -52,7 +57,7 @@ export async function synthesizeSpeech(text, { language = 'en', voiceGender = 'f
     }
     return Buffer.concat(chunks);
   } catch (err) {
-    console.warn('[polly] TTS failed:', err.message);
+    console.warn('[polly] TTS failed:', err.message, voice);
     return null;
   }
 }

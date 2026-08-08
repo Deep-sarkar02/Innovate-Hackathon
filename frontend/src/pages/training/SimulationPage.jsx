@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock } from 'lucide-react';
 import MeetingRoom from '../../components/livekit/MeetingRoom.jsx';
@@ -45,23 +45,41 @@ export default function SimulationPage() {
   const language = location.state?.language ?? sessionData?.sessionBrief?.language ?? 'en';
   const langConfig = getLanguageConfig(language);
 
-  const { speak, speaking: customerSpeaking } = useTextToSpeech({ language, voiceGender: location.state?.voiceGender ?? 'female' });
+  const handleCustomerReplyRef = useRef(null);
 
-  const handleCustomerReply = useCallback((text) => speak(text), [speak]);
-
-  const { transcript, customerState, sessionBrief, thinking, aiMode, appendTurn } = useTrainingSession(sessionId, {
+  const { transcript, customerState, sessionBrief, thinking, aiMode, stateDeltas, appendTurn } = useTrainingSession(sessionId, {
     enabled: !sessionEnded,
-    onCustomerReply: handleCustomerReply,
+    onCustomerReply: (text) => handleCustomerReplyRef.current?.(text),
   });
 
   const brief = sessionBrief ?? sessionData?.sessionBrief;
+  const customerPersona = brief?.persona ?? 'father';
+  const customerVoice = brief?.voiceGender ?? location.state?.voiceGender ?? 'female';
+
+  const { speak, speaking: customerSpeaking, provider: ttsProvider, voiceInfo, ttsError } = useTextToSpeech({
+    language,
+    voiceGender: customerVoice,
+    persona: customerPersona,
+  });
+
+  handleCustomerReplyRef.current = speak;
+
+  const openingSpokenRef = useRef(false);
+  const openingLine = location.state?.openingLine ?? sessionData?.openingLine;
+
+  useEffect(() => {
+    if (!openingLine || openingSpokenRef.current || sessionEnded) return;
+    openingSpokenRef.current = true;
+    speak(openingLine);
+  }, [openingLine, speak, sessionEnded]);
+
   const demoMode = !sessionData?.tokens?.salesToken || sessionData.tokens.salesToken.startsWith('demo-');
   const liveActive = !sessionEnded;
   const livekitEnabled = Boolean(sessionData?.tokens?.salesToken && sessionData?.livekitUrl && !demoMode);
 
   const speechEnabled = liveActive && !isMuted && !customerSpeaking && !thinking;
 
-  const { listening, supported, error: speechError } = useSpeechRecognition({
+  const { listening, supported, error: speechError, provider: sttProvider } = useSpeechRecognition({
     onResult: (_speaker, text) => appendTurn(text),
     enabled: speechEnabled,
     speaker: 'sales_executive',
@@ -92,7 +110,10 @@ export default function SimulationPage() {
             </button>
             <div>
               <h1 className="text-sm font-medium">Training Simulation</h1>
-              <p className="text-xs text-slate-500 capitalize">{brief?.objective?.replace(/_/g, ' ')} · {brief?.persona?.replace(/_/g, ' ')}</p>
+              <p className="text-xs text-slate-500">
+                {brief?.displayName ?? brief?.customerName ?? 'Customer'}
+                {brief?.objective && ` · ${brief.objective.replace(/_/g, ' ')}`}
+              </p>
             </div>
           </div>
           {liveActive && <SessionTimer startTime={sessionData?.startTime} />}
@@ -122,6 +143,26 @@ export default function SimulationPage() {
           </div>
         )}
 
+        {liveActive && ttsProvider === 'polly' && (
+          <div className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
+            🔊 Customer voice: {voiceInfo?.label ?? 'Amazon Polly · Indian accent'}
+          </div>
+        )}
+        {liveActive && ttsProvider === 'browser' && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+            🔊 Using browser voice — Polly not connected. Check AWS IAM credentials and refresh the page.
+          </div>
+        )}
+        {liveActive && ttsError && (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+            Polly error: {ttsError}
+          </div>
+        )}
+        {liveActive && sttProvider === 'transcribe' && (
+          <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
+            🎙 Voice input via Amazon Transcribe — speak naturally, pauses are detected automatically.
+          </div>
+        )}
         {liveActive && (!supported || speechError) && (
           <div className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-300">
             🎙 Voice is unavailable ({!supported ? 'browser does not support speech recognition' : 'microphone blocked'}).
@@ -159,7 +200,11 @@ export default function SimulationPage() {
             )}
           </div>
           <div className="space-y-4">
-            <CustomerStatePanel customerState={customerState ?? sessionData?.customerState} />
+            <CustomerStatePanel
+              customerState={customerState ?? sessionData?.customerState}
+              stateDeltas={stateDeltas}
+              updating={thinking}
+            />
           </div>
         </div>
       </main>

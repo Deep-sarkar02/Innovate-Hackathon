@@ -5,9 +5,9 @@ export function isLlmConfigured() {
   return isBedrockConfigured() || isOpenAiConfigured();
 }
 
-export async function callLLM(messages, jsonMode = false) {
+export async function callLLM(messages, jsonMode = false, options = {}) {
   if (isBedrockConfigured()) {
-    const result = await callBedrock(messages, jsonMode);
+    const result = await callBedrock(messages, jsonMode, options);
     if (result) return result;
   }
 

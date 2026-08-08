@@ -8,12 +8,13 @@ const router = Router();
 
 const planSchema = Joi.object({
   repId: Joi.string(),
+  profileId: Joi.string(),
 });
 
 router.post('/plan', authenticate, validate(planSchema), async (req, res, next) => {
   try {
     const repId = req.body.repId ?? req.user.id;
-    const plan = await previewPlan(repId);
+    const plan = await previewPlan(repId, { profileId: req.body.profileId });
     res.json(plan);
   } catch (err) {
     next(err);
@@ -22,7 +23,7 @@ router.post('/plan', authenticate, validate(planSchema), async (req, res, next) 
 
 router.get('/plan/today', authenticate, async (req, res, next) => {
   try {
-    const plan = await previewPlan(req.user.id);
+    const plan = await previewPlan(req.user.id, { profileId: req.query.profileId });
     res.json(plan);
   } catch (err) {
     next(err);

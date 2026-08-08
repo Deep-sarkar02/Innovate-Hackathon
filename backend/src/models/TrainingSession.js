@@ -22,14 +22,30 @@ const sessionBriefSchema = new mongoose.Schema(
     goal: { type: String },
     cohortId: { type: String, required: true },
     cohortVersion: { type: Number, required: true },
-    // These were always returned by the planner but silently DROPPED by this
-    // strict schema — so the customer agent read undefined at reply time.
+    profileId: { type: String },
+    displayName: { type: String },
     customerName: { type: String },
+    childName: { type: String },
+    childGrade: { type: Number },
+    childGender: { type: String },
+    board: { type: String },
+    testName: { type: String },
+    brandAwareness: { type: String },
+    existingTuition: { type: String },
+    difficultyLabel: { type: String },
+    summary: { type: String },
+    openingLine: { type: String },
+    successState: { type: String },
+    failureState: { type: String },
     language: { type: String },
     city: { type: String },
+    state: { type: String },
     region: { type: String },
+    objections: { type: [mongoose.Schema.Types.Mixed], default: undefined },
+    yieldConditions: { type: [String], default: undefined },
+    stateSeed: { type: mongoose.Schema.Types.Mixed, default: undefined },
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const customerStateSchema = new mongoose.Schema(
@@ -45,8 +61,11 @@ const customerStateSchema = new mongoose.Schema(
     // Topics the rep has already used — powers diminishing returns so
     // repeating "scholarship" five times is not five boosts.
     mentionedTopics: { type: [String], default: [] },
+    objectionsRaised: { type: [String], default: [] },
+    conversationPhase: { type: String, default: 'cold_open' },
+    turnCount: { type: Number, default: 0 },
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const transcriptEntrySchema = new mongoose.Schema(

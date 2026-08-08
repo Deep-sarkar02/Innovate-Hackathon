@@ -17,6 +17,7 @@ const startSchema = Joi.object({
   language: Joi.string().valid('en', 'hi'),
   voiceGender: Joi.string().valid('female', 'male'),
   voicePersona: Joi.string(),
+  profileId: Joi.string(),
 });
 
 const transcriptSchema = Joi.object({

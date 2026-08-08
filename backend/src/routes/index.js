@@ -11,6 +11,8 @@ import analyticsRoutes from '../modules/analytics/analytics.routes.js';
 import lmsRoutes from '../modules/lms-recommend/recommend.routes.js';
 import courseRoutes from '../modules/courses/course.routes.js';
 import ttsRoutes from '../modules/tts/tts.routes.js';
+import sttRoutes from '../modules/stt/stt.routes.js';
+import customerProfileRoutes from '../modules/customer-profiles/customer-profiles.routes.js';
 
 const router = Router();
 
@@ -25,6 +27,8 @@ router.use('/analytics', analyticsRoutes);
 router.use('/lms', lmsRoutes);
 router.use('/courses', courseRoutes);
 router.use('/tts', ttsRoutes);
+router.use('/stt', sttRoutes);
+router.use('/customer-profiles', customerProfileRoutes);
 router.use('/', aiRoutes);
 
 export default router;

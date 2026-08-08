@@ -32,15 +32,15 @@ function stripJsonFences(text) {
   return cleaned.trim();
 }
 
-export async function callBedrock(messages, jsonMode = false) {
+export async function callBedrock(messages, jsonMode = false, options = {}) {
   if (!client) return null;
 
   try {
     const response = await client.chat.completions.create({
       model: env.bedrockModel,
       messages: prepareMessages(messages, jsonMode),
-      max_tokens: 4096,
-      temperature: jsonMode ? 0.3 : 0.5,
+      max_tokens: options.max_tokens ?? 4096,
+      temperature: options.temperature ?? (jsonMode ? 0.3 : 0.5),
       ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     });
 

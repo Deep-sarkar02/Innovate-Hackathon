@@ -36,7 +36,7 @@ export const env = {
   awsSessionToken: process.env.AWS_SESSION_TOKEN || '',
   awsProfile: process.env.AWS_PROFILE || '',
   awsRegion: process.env.AWS_REGION || 'us-west-2',
-  bedrockModel: process.env.BEDROCK_MODEL || 'mistral.ministral-3-8b-instruct',
+  bedrockModel: process.env.BEDROCK_MODEL || 'mistral.ministral-3-14b-instruct',
 };
 
 export function isLiveKitConfigured() {
@@ -58,5 +58,9 @@ export function isBedrockConfigured() {
 }
 
 export function isPollyConfigured() {
+  return Boolean(env.awsAccessKeyId && env.awsSecretAccessKey);
+}
+
+export function isTranscribeConfigured() {
   return Boolean(env.awsAccessKeyId && env.awsSecretAccessKey);
 }

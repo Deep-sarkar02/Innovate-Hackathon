@@ -43,8 +43,8 @@ export const repApi = {
 };
 
 export const trainingApi = {
-  getTodayPlan: () => api.get('/training/plan/today'),
-  previewPlan: (repId) => api.post('/training/plan', { repId }),
+  getTodayPlan: (profileId) => api.get('/training/plan/today', { params: { profileId } }),
+  previewPlan: (repId, profileId) => api.post('/training/plan', { repId, profileId }),
   startSession: (data) => api.post('/training/start', data),
   getSession: (sessionId) => api.get(`/training/${sessionId}`),
   appendTurn: (sessionId, data) => api.post(`/training/${sessionId}/transcript`, data),
@@ -78,6 +78,11 @@ export const cohortApi = {
   get: (cohortId, version) => api.get(`/cohorts/${cohortId}`, { params: { version } }),
 };
 
+export const customerProfileApi = {
+  list: () => api.get('/customer-profiles'),
+  get: (profileId) => api.get(`/customer-profiles/${profileId}`),
+};
+
 export const lmsApi = {
   getCatalog: () => api.get('/lms/catalog'),
   getMyRecommendations: (objective) =>
@@ -87,9 +92,15 @@ export const lmsApi = {
 };
 
 export const ttsApi = {
-  status: () => api.get('/tts/status'),
+  status: ({ language = 'en', voiceGender = 'female', persona } = {}) =>
+    api.get('/tts/status', { params: { language, voiceGender, persona } }),
   speak: (data) =>
     api.post('/tts/speak', data, { responseType: 'arraybuffer' }),
+};
+
+export const sttApi = {
+  status: () => api.get('/stt/status'),
+  transcribe: (data) => api.post('/stt/transcribe', data),
 };
 
 export default api;

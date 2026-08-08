@@ -1,11 +1,11 @@
 export const LANGUAGES = [
-  { id: 'en', label: 'English', speechLang: 'en-US', ttsLang: 'en-US' },
+  { id: 'en', label: 'English (India)', speechLang: 'en-IN', ttsLang: 'en-IN' },
   { id: 'hi', label: 'Hindi', speechLang: 'hi-IN', ttsLang: 'hi-IN' },
 ];
 
 export const VOICE_GENDERS = [
-  { id: 'female', label: 'Female' },
-  { id: 'male', label: 'Male' },
+  { id: 'female', label: 'Female', hintEn: 'Raveena · Indian English', hintHi: 'Kajal · Hindi Neural' },
+  { id: 'male', label: 'Male', hintEn: 'Aditi · Indian English', hintHi: 'Aditi · Hindi' },
 ];
 
 export const DEFAULT_SESSION = {

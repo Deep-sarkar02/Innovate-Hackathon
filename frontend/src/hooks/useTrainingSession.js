@@ -8,6 +8,7 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
   const [sessionBrief, setSessionBrief] = useState(null);
   const [thinking, setThinking] = useState(false);
   const [aiMode, setAiMode] = useState(null); // 'llm' | 'mock'
+  const [stateDeltas, setStateDeltas] = useState({});
   const processingRef = useRef(false);
   const onCustomerReplyRef = useRef(onCustomerReply);
   onCustomerReplyRef.current = onCustomerReply;
@@ -40,7 +41,11 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
           text: text.trim(),
         });
         if (data.transcript) setTranscript(data.transcript);
-        if (data.customerState) setCustomerState(data.customerState);
+        if (data.customerState) setCustomerState({ ...data.customerState });
+        if (data.stateDeltas && Object.keys(data.stateDeltas).length > 0) {
+          setStateDeltas(data.stateDeltas);
+          setTimeout(() => setStateDeltas({}), 2500);
+        }
         if (data.aiMode) setAiMode(data.aiMode);
         if (data.customerReply?.text) onCustomerReplyRef.current?.(data.customerReply.text);
       } catch (err) {
@@ -59,6 +64,7 @@ export function useTrainingSession(sessionId, { enabled = true, onCustomerReply 
     sessionBrief,
     thinking,
     aiMode,
+    stateDeltas,
     appendTurn,
   };
 }

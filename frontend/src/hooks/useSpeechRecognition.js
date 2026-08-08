@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { sttApi } from '../services/api.js';
+import { useTranscribeSpeech } from './useTranscribeSpeech.js';
 
-export function useSpeechRecognition({ onResult, enabled = true, speaker = 'sales_executive', lang = 'en-US' }) {
+function useBrowserSpeechRecognition({ onResult, enabled = true, speaker = 'sales_executive', lang = 'en-US' }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
   const [error, setError] = useState(null);
@@ -84,5 +86,22 @@ export function useSpeechRecognition({ onResult, enabled = true, speaker = 'sale
     };
   }, [enabled, speaker, lang]);
 
-  return { listening, supported, error };
+  return { listening, supported, error, provider: 'browser' };
+}
+
+export function useSpeechRecognition(options) {
+  const [provider, setProvider] = useState(null);
+
+  useEffect(() => {
+    sttApi.status().then(({ data }) => setProvider(data.provider)).catch(() => setProvider('browser'));
+  }, []);
+
+  const transcribe = useTranscribeSpeech({ ...options, enabled: options.enabled && provider === 'transcribe' });
+  const browser = useBrowserSpeechRecognition({ ...options, enabled: options.enabled && provider === 'browser' });
+
+  if (provider === null) {
+    return { listening: false, supported: true, error: null, provider: null };
+  }
+
+  return provider === 'transcribe' ? transcribe : browser;
 }

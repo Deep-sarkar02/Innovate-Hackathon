@@ -1,7 +1,8 @@
 import { callLLM, isLlmConfigured } from './llm.client.js';
-import { getKnowledgeForBrief } from '../cohort-kb/cohort-kb.service.js';
+import { getCustomerKnowledgeForBrief } from '../cohort-kb/cohort-kb.service.js';
+import { sanitizeForSpeech } from '../../utils/speechText.js';
 import { OBJECTIONS } from '../../seed/cohorts.seed.js';
-
+import { buildInstructorPrompt } from '../customer-profiles/customer-instructor.js';
 /**
  * Customer Agent — talks. Never evaluates, never coaches.
  *
@@ -18,34 +19,38 @@ import { OBJECTIONS } from '../../seed/cohorts.seed.js';
  *    inside the mock reply). All three are fixed.
  */
 
-const PERSONA_PROMPTS = {
-  father:
-    'You are the father of a school-going child (grade 1-8) who recently took an aptitude/foundation '
-    + 'test through their school. You are practical and budget-conscious — school fees already stretch '
-    + 'the family budget, and any big amount only works as a monthly EMI. You care about concrete '
-    + 'results, not marketing language.',
-  mother:
-    'You are the mother of a school-going child (grade 1-8) who recently took an aptitude/foundation '
-    + 'test through their school. You are deeply invested in your child\'s education, cautious about '
-    + 'online programs, and you weigh trust and proof heavily. Big financial decisions are made '
-    + 'together with your spouse.',
-  both_parents:
-    'You are BOTH parents of a school-going child on the same call (18.6% of real demos have both '
-    + 'parents). One of you is cost-focused, the other quality-focused. Occasionally hand the '
-    + 'conversation between the two voices, e.g. "My husband is asking—" / "Let me give the phone '
-    + 'to my wife." The rep must convince both of you.',
-  student:
-    'You are a grade 9-12 student preparing for boards and JEE/NEET foundation. You are curious but '
-    + 'not the decision maker — your parents decide payments. You get excited about content but '
-    + 'deflect money questions to your parents.',
-};
+function buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, language = 'en') {
+  const lang = language === 'hi' ? 'hi' : 'en';
+  const briefForPrompt = {
+    ...sessionBrief,
+    language: lang,
+    objections: sessionBrief.objections,
+    yieldConditions: sessionBrief.yieldConditions,
+  };
 
-const MOOD_MODIFIERS = {
-  skeptical: 'You are skeptical and need strong proof before believing anything.',
-  neutral: 'You are neutral — neither enthusiastic nor dismissive.',
-  interested: 'You are somewhat interested but have concerns to address.',
-  frustrated: 'You are frustrated from bad past experiences with other coaching or tuition.',
-};
+  const instructorBlock = buildInstructorPrompt(briefForPrompt, {
+    turnCount: customerState.turnCount ?? 0,
+    conversationPhase: customerState.conversationPhase ?? 'cold_open',
+  });
+
+  const objection = OBJECTIONS[normalizeObjection(sessionBrief.primaryObjection)];
+  const { customerFacts } = knowledge;
+
+  const backgroundBlock = customerFacts
+    .map((n) => `- ${n.content}`)
+    .join('\n');
+
+  return `${instructorBlock}
+
+ADDITIONAL CONTEXT FROM KNOWLEDGE BASE:
+${backgroundBlock || '- Your child took a school test via Infinity Learn.'}
+
+PRIMARY OBJECTION THIS SESSION: ${objection.label} — "${objection.customerLine}"
+
+INTERNAL STATE (adjust tone, never say numbers aloud):
+- Trust: ${customerState.trust}/100 | Budget comfort: ${customerState.financialComfort}/100 | Decision readiness: ${customerState.decisionReadiness}/100
+- If trust > 70, soften slightly. If trust < 30, become more resistant or end the call politely.`;
+}
 
 // Legacy objection ids (pre-rewrite briefs may still carry them)
 const LEGACY_OBJECTION_MAP = {
@@ -63,80 +68,62 @@ export function normalizeObjection(objectionId) {
   return LEGACY_OBJECTION_MAP[objectionId] ?? 'financial_constraint';
 }
 
-function buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, language = 'en') {
-  const persona = PERSONA_PROMPTS[sessionBrief.persona] ?? PERSONA_PROMPTS.father;
-  const mood = MOOD_MODIFIERS[sessionBrief.mood] ?? MOOD_MODIFIERS.neutral;
-  const lang = language === 'hi' ? 'Respond in Hindi (Devanagari script).' : 'Respond in English.';
-  const objection = OBJECTIONS[normalizeObjection(sessionBrief.primaryObjection)];
-
-  const knowledgeContext = [
-    ...knowledge.objectionNodes.map((n) => `[Objection] ${n.content}`),
-    ...knowledge.pitchNodes.map((n) => `[Info you know] ${n.content}`),
-  ].join('\n');
-
-  return `You are a simulated CUSTOMER in a sales training exercise for Infinity Learn (EdTech).
-${persona}
-${mood}
-
-TODAY'S SCENARIO (you do NOT know the rep's scores):
-- Your primary concern: ${objection.label} — a natural way you might voice it: "${objection.customerLine}"
-- Session goal being tested: ${sessionBrief.objective?.replace(/_/g, ' ')}
-- Your city: ${sessionBrief.city ?? 'Patna'}
-
-YOUR CURRENT STATE (adjust responses based on these internal feelings):
-- Trust: ${customerState.trust}/100
-- Financial comfort: ${customerState.financialComfort}/100
-- Academic anxiety: ${customerState.academicAnxiety}/100
-- Decision readiness: ${customerState.decisionReadiness}/100
-
-KNOWLEDGE YOU HAVE:
-${knowledgeContext || 'You know coaching is expensive and you want the best for your child. Any large amount only works as monthly EMI.'}
-
-RULES:
-- You are the CUSTOMER, not the salesperson. Never offer to sell anything.
-- Never evaluate or coach the salesperson.
-- Stay in character as a ${sessionBrief.persona} with a ${sessionBrief.mood} mood.
-- Directly respond to what the sales rep just said — reference their specific points.
-- Raise your primary concern naturally — do not volunteer it in the first turn.
-- React to what the rep ACTUALLY says. If they claim something without proof, push back.
-- If the rep only quotes an annual price, ask what it means per month — EMI is how your family thinks about money.
-- Keep responses concise (1-3 sentences). ${lang}
-- If trust rises above 70, become slightly more open. If below 30, become more resistant.`;
-}
-
-// ── Deterministic state machine (shared by mock and LLM paths) ──────────
-
 const TOPIC_RULES = [
   {
+    topic: 'greeting',
+    words: ['hello', 'hi', 'hey', 'namaste', 'good morning', 'good afternoon', 'good evening'],
+    effects: { trust: 2, emotionalConfidence: 2 },
+  },
+  {
     topic: 'emi',
-    words: ['emi', 'installment', 'instalment', 'monthly', 'bajaj', 'fibe', 'finance'],
-    effects: { financialComfort: 8, trust: 3 },
+    words: ['emi', 'installment', 'instalment', 'monthly', 'per month', 'bajaj', 'fibe', 'finance'],
+    effects: { financialComfort: 10, trust: 4, decisionReadiness: 3 },
   },
   {
     topic: 'scholarship',
     words: ['scholarship', 'discount', 'waiver', 'concession'],
-    effects: { financialComfort: 5, trust: 2 },
+    effects: { financialComfort: 6, trust: 3 },
   },
   {
     topic: 'proof',
-    words: ['result', 'rank', 'topper', 'report', 'test', 'score'],
-    effects: { belief: 5, trust: 4 },
+    words: ['result', 'rank', 'topper', 'report', 'test', 'score', 'diagnostic', 'gap'],
+    effects: { belief: 6, trust: 5, academicAnxiety: -3 },
   },
   {
     topic: 'selection',
     words: ['selected', 'selection', 'chosen', 'shortlisted'],
-    effects: { trust: 4, urgency: 5 },
+    effects: { trust: 5, urgency: 6, competitorAffinity: -2 },
   },
   {
     topic: 'demo',
-    words: ['demo', 'session', 'google meet', 'meeting'],
-    effects: { decisionReadiness: 6 },
+    words: ['demo', 'google meet', 'meeting', 'slot', 'timing'],
+    effects: { decisionReadiness: 8, trust: 2 },
+  },
+  {
+    topic: 'faculty',
+    words: ['faculty', 'teacher', 'iit', 'mentor', 'expert'],
+    effects: { belief: 5, trust: 4, competitorAffinity: -4 },
+  },
+  {
+    topic: 'empathy',
+    words: ['understand', 'appreciate', 'concern', 'worried', 'feel'],
+    effects: { trust: 5, emotionalConfidence: 4 },
+  },
+  {
+    topic: 'pricing',
+    words: ['price', 'fee', 'fees', 'cost', 'rupees', 'amount', 'package', 'ultimate', 'regular'],
+    effects: { trust: 2, urgency: 2 },
   },
   {
     topic: 'close',
-    words: ['enroll', 'enrol', 'admission', 'register', 'confirm'],
-    effects: { decisionReadiness: 8 },
+    words: ['enroll', 'enrol', 'admission', 'register', 'confirm', 'book'],
+    effects: { decisionReadiness: 10, urgency: 4 },
   },
+];
+
+export const CUSTOMER_STATE_KEYS = [
+  'belief', 'trust', 'urgency', 'financialComfort',
+  'emotionalConfidence', 'academicAnxiety', 'competitorAffinity', 'decisionReadiness',
 ];
 
 const NEGATION_RE = /\b(don'?t|do not|no|never|can'?t|cannot|won'?t|not|nahi|nahin)\b/i;
@@ -159,8 +146,6 @@ export function updateCustomerState(customerState, repText, sessionBrief, mentio
 
   for (const rule of TOPIC_RULES) {
     if (!positiveTopicMention(repText, rule.words)) continue;
-    // Diminishing returns: repeating a keyword is not progress. First mention
-    // full effect, later mentions 25% — kills the "spam scholarship" exploit.
     const factor = seen.includes(rule.topic) ? 0.25 : 1;
     for (const [key, amount] of Object.entries(rule.effects)) {
       customerState[key] = (customerState[key] ?? 50) + Math.round(amount * factor);
@@ -168,23 +153,139 @@ export function updateCustomerState(customerState, repText, sessionBrief, mentio
     if (!seen.includes(rule.topic)) seen.push(rule.topic);
   }
 
-  // Empty/near-empty turns erode trust slightly
   if (repText.trim().length < 10) {
     customerState.trust = (customerState.trust ?? 50) - 2;
   }
 
-  for (const key of [
-    'belief', 'trust', 'urgency', 'financialComfort',
-    'emotionalConfidence', 'academicAnxiety', 'competitorAffinity', 'decisionReadiness',
-  ]) {
-    if (customerState[key] != null) {
-      customerState[key] = Math.max(0, Math.min(100, customerState[key]));
-    }
+  if (repText.trim().length >= 20) {
+    customerState.emotionalConfidence = (customerState.emotionalConfidence ?? 50) + 1;
   }
 
   if (customerState.mentionedTopics !== undefined || mentionedTopics === null) {
     customerState.mentionedTopics = seen;
   }
+  return clampCustomerState(customerState);
+}
+
+function clampCustomerState(customerState) {
+  for (const key of CUSTOMER_STATE_KEYS) {
+    if (customerState[key] != null) {
+      customerState[key] = Math.max(0, Math.min(100, customerState[key]));
+    }
+  }
+  return customerState;
+}
+
+/** Nudge state from what the customer just said — makes the panel feel live. */
+export function applyCustomerReplyStateEffects(customerState, customerText) {
+  if (!customerText?.trim()) return customerState;
+
+  const t = customerText.toLowerCase();
+
+  if (/\b(too high|too much|cannot afford|can't afford|don't believe|not sure|think about|next week|later|husband|wife|spouse|expensive|budget)\b/i.test(t)) {
+    customerState.trust = (customerState.trust ?? 50) - 4;
+    customerState.decisionReadiness = (customerState.decisionReadiness ?? 50) - 5;
+    customerState.financialComfort = (customerState.financialComfort ?? 50) - 3;
+  }
+
+  if (/\b(okay|alright|sounds good|tell me more|how much per month|interested|demo|let's see|we can|fine)\b/i.test(t)) {
+    customerState.trust = (customerState.trust ?? 50) + 3;
+    customerState.decisionReadiness = (customerState.decisionReadiness ?? 50) + 4;
+  }
+
+  if (/\b(tuition|coaching|already enrolled|other class|competitor|allen|aakash)\b/i.test(t)) {
+    customerState.competitorAffinity = (customerState.competitorAffinity ?? 50) + 4;
+  }
+
+  if (/\b(gap|weak|score|math|child|report|improve|result)\b/i.test(t)) {
+    customerState.academicAnxiety = (customerState.academicAnxiety ?? 50) + 2;
+    customerState.belief = (customerState.belief ?? 50) + 2;
+  }
+
+  return clampCustomerState(customerState);
+}
+
+export function computeStateDeltas(before, after) {
+  const deltas = {};
+  for (const key of CUSTOMER_STATE_KEYS) {
+    const delta = (after?.[key] ?? 0) - (before?.[key] ?? 0);
+    if (delta !== 0) deltas[key] = delta;
+  }
+  return deltas;
+}
+
+export function snapshotCustomerState(state) {
+  const snap = {};
+  for (const key of CUSTOMER_STATE_KEYS) {
+    snap[key] = state?.[key] ?? 0;
+  }
+  snap.mentionedTopics = [...(state?.mentionedTopics ?? [])];
+  snap.objectionsRaised = [...(state?.objectionsRaised ?? [])];
+  snap.conversationPhase = state?.conversationPhase ?? 'cold_open';
+  snap.turnCount = state?.turnCount ?? 0;
+  return snap;
+}
+
+function normalizeForCompare(text) {
+  return (text ?? '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function isNearDuplicate(a, b) {
+  const na = normalizeForCompare(a);
+  const nb = normalizeForCompare(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.length > 20 && nb.includes(na.slice(0, Math.min(40, na.length)))) return true;
+  return false;
+}
+
+function getCustomerLines(transcript) {
+  return (transcript ?? [])
+    .filter((t) => t.speaker === 'customer')
+    .map((t) => t.text)
+    .slice(-4);
+}
+
+export function computeConversationPhase(customerState, repText) {
+  const trust = customerState.trust ?? 35;
+  const topics = customerState.mentionedTopics ?? [];
+  const turn = customerState.turnCount ?? 0;
+
+  if (trust < 20 && turn > 4) return 'exit';
+  if (trust > 65 && topics.includes('demo')) return 'closing';
+  if (trust > 50 && (topics.includes('emi') || topics.includes('proof'))) return 'warming';
+  if (customerState.objectionsRaised?.length > 0) return 'objection';
+  if (topics.includes('proof') || topics.includes('greeting')) return 'discovery';
+  if (topics.includes('greeting') || /infinity|chaitanya|school|test|name is/i.test(repText)) return 'credibility';
+  if (turn <= 2) return 'cold_open';
+  return 'discovery';
+}
+
+function detectObjectionRaised(text, sessionBrief) {
+  const t = text.toLowerCase();
+  const objections = sessionBrief.objections ?? [];
+  for (const obj of objections) {
+    const id = obj.id;
+    if (id === 'need_time' && /think|soch|time|baad mein|later/i.test(t)) return id;
+    if (id === 'family_consultation' && /wife|husband|spouse|papa|mummy|discuss|baat kar/i.test(t)) return id;
+    if (id === 'competitor_locked' && /tuition|coaching|already|class chal/i.test(t)) return id;
+    if (id === 'financial_constraint' && /price|fee|cost|budget|kitna|mahanga|afford/i.test(t)) return id;
+    if (id === 'trust_deficit' && /believe|trust|proof|kaise pata|works/i.test(t)) return id;
+  }
+  return null;
+}
+
+export function advanceConversationState(customerState, repText, sessionBrief, customerReplyText) {
+  customerState.turnCount = (customerState.turnCount ?? 0) + 1;
+  customerState.conversationPhase = computeConversationPhase(customerState, repText);
+
+  if (customerReplyText) {
+    const raised = detectObjectionRaised(customerReplyText, sessionBrief);
+    if (raised && !(customerState.objectionsRaised ?? []).includes(raised)) {
+      customerState.objectionsRaised = [...(customerState.objectionsRaised ?? []), raised];
+    }
+  }
+
   return customerState;
 }
 
@@ -198,8 +299,6 @@ function mockCustomerReply(sessionBrief, repText, customerState) {
   const objection = normalizeObjection(sessionBrief.primaryObjection);
   const o = OBJECTIONS[objection];
 
-  // Word-boundary greeting — the old substring check classified "which
-  // batch" and "the child" as greetings.
   if (GREETING_RE.test(repText) && (customerState.mentionedTopics ?? []).length === 0) {
     return hi
       ? 'नमस्ते। हाँ बोलिए, स्कूल में जो टेस्ट हुआ था उसी के बारे में कॉल है क्या?'
@@ -247,22 +346,47 @@ function mockCustomerReply(sessionBrief, repText, customerState) {
 export async function generateCustomerReply(session, repMessage) {
   const { sessionBrief, customerState, transcript, language } = session;
   const replyLanguage = language ?? sessionBrief.language ?? 'en';
-  const knowledge = await getKnowledgeForBrief(sessionBrief);
+  const knowledge = await getCustomerKnowledgeForBrief(sessionBrief);
 
   const history = transcript
-    .slice(-10)
+    .slice(-14)
     .map((t) => `${t.speaker}: ${t.text}`)
     .join('\n');
+
+  const previousCustomerLines = getCustomerLines(transcript);
+  const phase = customerState.conversationPhase ?? 'cold_open';
+  const objectionsLeft = (sessionBrief.objections ?? [])
+    .filter((o) => !(customerState.objectionsRaised ?? []).includes(o.id))
+    .map((o) => o.sample_line)
+    .slice(0, 2);
+
+  const userPrompt = `Conversation so far:
+${history || '(session just started)'}
+
+Sales rep just said: "${repMessage}"
+
+YOUR PREVIOUS LINES (do NOT repeat these questions or phrases):
+${previousCustomerLines.length ? previousCustomerLines.map((l) => `- "${l}"`).join('\n') : '(opening only)'}
+
+Stage: ${phase} | Turn: ${(customerState.turnCount ?? 0) + 1}
+${objectionsLeft.length ? `Next objection you may raise (only if rep hasn't addressed it): "${objectionsLeft[0]}"` : 'Rep is doing well — soften and move toward demo timing.'}
+
+Respond as ${sessionBrief.customerName ?? 'the customer'} (${sessionBrief.persona}). Acknowledge what the rep said, then move FORWARD. 1–3 sentences only.`;
 
   if (isLlmConfigured()) {
     const reply = await callLLM([
       { role: 'system', content: buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, replyLanguage) },
-      {
-        role: 'user',
-        content: `Conversation so far:\n${history || '(session just started)'}\n\nSales rep just said: "${repMessage}"\n\nRespond as the customer. Address their specific message.`,
-      },
-    ]);
-    if (reply) return { text: reply.trim(), mode: 'llm' };
+      { role: 'user', content: userPrompt },
+    ], false, { temperature: 0.68, max_tokens: 180 });
+
+    if (reply) {
+      let clean = sanitizeForSpeech(reply.trim());
+      const lastLine = previousCustomerLines[previousCustomerLines.length - 1];
+      if (clean && lastLine && isNearDuplicate(clean, lastLine)) {
+        clean = sanitizeForSpeech(`${clean} Theek hai, aage batayiye.`);
+      }
+      if (clean) return { text: clean, mode: 'llm' };
+    }
   }
 
   return { text: mockCustomerReply(sessionBrief, repMessage, customerState), mode: 'mock' };

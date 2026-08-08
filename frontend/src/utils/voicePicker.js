@@ -1,30 +1,43 @@
+const INDIAN_VOICE_HINTS = {
+  female: [
+    'raveena', 'kajal', 'aditi', 'swara', 'lekha', 'heera', 'priya', 'neerja',
+    'veena', 'google hindi', 'microsoft heera', 'india english',
+  ],
+  male: [
+    'aditi', 'ravi', 'kumar', 'arjun', 'amit', 'prabhat', 'google hindi',
+    'microsoft ravi', 'india english',
+  ],
+};
+
 export function pickVoice(lang, gender) {
   if (!window.speechSynthesis) return null;
 
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
 
-  const langPrefix = lang.startsWith('hi') ? 'hi' : 'en';
-  const langVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
-  const pool = langVoices.length ? langVoices : voices;
+  const isHindi = lang.toLowerCase().startsWith('hi');
+  const preferredLocales = isHindi
+    ? ['hi-in', 'hi']
+    : ['en-in', 'en-gb', 'en'];
 
-  const femaleHints = ['female', 'zira', 'samantha', 'karen', 'veena', 'lekha', 'priya', 'heera', 'swara', 'aditi'];
-  const maleHints = ['male', 'david', 'mark', 'ravi', 'kumar', 'arjun', 'amit'];
+  let pool = voices;
+  for (const locale of preferredLocales) {
+    const match = voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(locale));
+    if (match.length) {
+      pool = match;
+      break;
+    }
+  }
 
-  const hints = gender === 'female' ? femaleHints : maleHints;
+  const hints = INDIAN_VOICE_HINTS[gender === 'male' ? 'male' : 'female'];
 
   const matched = pool.find((v) => {
     const name = v.name.toLowerCase();
     return hints.some((h) => name.includes(h));
   });
-
   if (matched) return matched;
 
-  if (gender === 'female') {
-    return pool.find((v) => !maleHints.some((h) => v.name.toLowerCase().includes(h))) ?? pool[0];
-  }
-
-  return pool.find((v) => maleHints.some((h) => v.name.toLowerCase().includes(h))) ?? pool[pool.length > 1 ? 1 : 0];
+  return pool[0] ?? voices[0];
 }
 
 export function loadVoices() {

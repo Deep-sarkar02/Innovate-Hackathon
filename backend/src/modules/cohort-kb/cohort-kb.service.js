@@ -99,6 +99,49 @@ export async function getKnowledgeForBrief(sessionBrief) {
   return { objectionNodes, pitchNodes, emotionNodes };
 }
 
+/** Customer-agent knowledge — parent-facing facts only (never rep coaching counters). */
+export async function getCustomerKnowledgeForBrief(sessionBrief) {
+  const version = sessionBrief.cohortVersion ?? 1;
+  const { cohortId, primaryObjection, objective } = sessionBrief;
+
+  const cohort = await getActiveCohort(cohortId, version);
+
+  const customerFacts = await KnowledgeNode.find({
+    cohortId,
+    cohortVersion: version,
+    type: 'customer_fact',
+  }).lean();
+
+  const objectionNodes = await KnowledgeNode.find({
+    cohortId,
+    cohortVersion: version,
+    type: 'objection',
+    $or: [{ tags: primaryObjection }, { tags: { $in: [primaryObjection] } }],
+  }).limit(5).lean();
+
+  const emotionNodes = await KnowledgeNode.find({
+    cohortId,
+    cohortVersion: version,
+    type: 'emotion',
+  }).limit(3).lean();
+
+  // Rep-only nodes (counters/pitch tactics) — kept for observer/coach, not customer
+  const repPlaybook = await KnowledgeNode.find({
+    cohortId,
+    cohortVersion: version,
+    type: { $in: ['counter', 'pitch'] },
+    relatedSkills: objective,
+  }).limit(5).lean();
+
+  return {
+    cohort,
+    customerFacts,
+    objectionNodes,
+    emotionNodes,
+    repPlaybook,
+  };
+}
+
 export async function parseAndIngestKnowledge(cohortId, cohortVersion, documents) {
   const nodes = [];
   for (const doc of documents) {

@@ -7,14 +7,35 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import { rateLimit } from './middleware/rateLimit.middleware.js';
 import { getAiStatus, isOpenAiConfigured } from './modules/agents/openai.client.js';
 import { isBedrockConfigured, isLlmConfigured } from './modules/agents/llm.client.js';
-import { isPollyConfigured } from './config/env.js';
+import { isPollyConfigured, isTranscribeConfigured } from './config/env.js';
 import { isLiveKitConfigured } from './config/env.js';
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.corsOrigin, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      const allowed = new Set([
+        env.corsOrigin,
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+      ]);
+      if (
+        !origin
+        || allowed.has(origin)
+        || (env.nodeEnv === 'development' && /^http:\/\/localhost:\d+$/.test(origin))
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked origin: ${origin}`));
+      }
+    },
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '3mb' }));
 
 // Health now reports AI degradation LOUDLY. A dead OpenAI key used to fail
 // silently into mock scoring — the demo looked fine while producing fakes.
@@ -27,6 +48,7 @@ app.get('/health', (_req, res) => {
       bedrockConfigured: isBedrockConfigured(),
       openaiConfigured: isOpenAiConfigured(),
       pollyTts: isPollyConfigured(),
+      transcribeStt: isTranscribeConfigured(),
       livekitConfigured: isLiveKitConfigured(),
       mode: isLlmConfigured() ? 'llm' : 'mock',
       lastOpenAiError: ai.lastError,
