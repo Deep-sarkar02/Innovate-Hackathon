@@ -5,7 +5,7 @@ import {
   buildPersonaVariables,
   resolvePersonaRole,
 } from '../src/modules/customer-profiles/customer-instructor.js';
-import { buildSessionBriefFromProfile, getCustomerProfile, resolveVoiceGender } from '../src/modules/customer-profiles/customer-profiles.service.js';
+import { buildSessionBriefFromProfile, getCustomerProfile, listCustomerProfiles, resolveVoiceGender } from '../src/modules/customer-profiles/customer-profiles.service.js';
 
 test('resolvePersonaRole reads persona from session brief string', () => {
   assert.equal(resolvePersonaRole({ persona: 'mother' }), 'mother');
@@ -43,4 +43,35 @@ test('father profile keeps father identity in instructor prompt', () => {
   assert.equal(brief.persona, 'father');
   assert.match(prompt, /Rajesh Kumar/);
   assert.match(prompt, /IDENTITY LOCK.*FATHER/i);
+});
+
+// Regression: listCustomerProfiles() passes the RAW profile (persona is an
+// object), not a sessionBrief (persona is a string). The old `??` chain took
+// the object, failed the typeof-string check, and defaulted every persona to
+// 'father' — so the picker showed mothers with a male voice.
+test('resolvePersonaRole reads persona.role from a raw profile object', () => {
+  assert.equal(resolvePersonaRole({ persona: { role: 'mother' } }), 'mother');
+  assert.equal(resolvePersonaRole({ persona: { role: 'student' } }), 'student');
+  assert.equal(resolvePersonaRole({ persona: { role: 'both_parents' } }), 'father');
+});
+
+test('every seeded profile resolves a voice gender matching its persona role', () => {
+  const profiles = listCustomerProfiles();
+  assert.ok(profiles.length >= 7, `expected the full ladder, got ${profiles.length}`);
+
+  const expected = { mother: 'female', father: 'male' };
+  for (const p of profiles) {
+    const want = expected[p.persona.role]
+      ?? (p.persona.childGender === 'female' ? 'female' : 'male'); // student
+    assert.equal(
+      p.voiceGender, want,
+      `${p.profileId} (${p.persona.role}) got ${p.voiceGender}, expected ${want}`,
+    );
+  }
+
+  // Not every persona may be voiced male — that was the symptom of the bug.
+  assert.ok(
+    new Set(profiles.map((p) => p.voiceGender)).size > 1,
+    'all profiles resolved to one gender — resolvePersonaRole is falling through to its default',
+  );
 });

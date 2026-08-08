@@ -50,10 +50,23 @@ function formatYieldConditions(conditions = []) {
 }
 
 /** Resolve persona role from session brief (profile-driven, not hardcoded). */
+const PERSONA_ROLES = ['father', 'mother', 'student', 'both_parents'];
+
+// Accepts either a sessionBrief (persona is a string role) or a raw profile
+// from customer-profiles.json (persona is an object with .role). Reading the
+// object case first matters: `??` only skips null/undefined, so an object-valued
+// persona would otherwise win and fail the string check, silently defaulting
+// every persona — mothers included — to 'father'.
 export function resolvePersonaRole(sessionBrief = {}) {
-  const raw = sessionBrief.persona ?? sessionBrief.personaRole ?? sessionBrief.persona?.role;
-  if (typeof raw === 'string' && ['father', 'mother', 'student', 'both_parents'].includes(raw)) {
-    return raw === 'both_parents' ? 'father' : raw;
+  const candidates = [
+    typeof sessionBrief.persona === 'string' ? sessionBrief.persona : sessionBrief.persona?.role,
+    sessionBrief.personaRole,
+    sessionBrief.persona_role,
+  ];
+  for (const raw of candidates) {
+    if (typeof raw === 'string' && PERSONA_ROLES.includes(raw)) {
+      return raw === 'both_parents' ? 'father' : raw;
+    }
   }
   return 'father';
 }
