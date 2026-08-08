@@ -276,7 +276,9 @@ export default function CourseItemPage() {
                 <HelpCircle className="w-4 h-4 text-amber-500" />
                 <p className="text-amber-600 text-xs font-semibold uppercase tracking-wider">Checkpoint — pages 1-{dueCheckpoint.afterPage}</p>
               </div>
-              <p className="text-slate-500 text-sm mb-4">Answer correctly to unlock the next pages. You can review earlier pages any time.</p>
+              {/* The page controls are hidden while a checkpoint is due (see below),
+                  so this must not promise review — it is a closed-book gate. */}
+              <p className="text-slate-500 text-sm mb-4">Answer correctly to unlock the next pages. Closed book — you cannot page back until this checkpoint is passed.</p>
               <QuizBlock questions={dueCheckpoint.questions} onSubmit={submitCheckpoint} submitting={submitting} result={quizResult} ctaLabel="Submit checkpoint" />
             </div>
           ) : current?.image ? (
