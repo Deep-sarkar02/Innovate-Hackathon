@@ -216,6 +216,15 @@ export async function endTrainingSession(sessionId) {
   session.endTime = new Date();
   await session.save();
 
+  // Whether a call is worth scoring is decided HERE, not by the client. The UI
+  // ends the session whenever the rep leaves, and at that moment it may not have
+  // loaded the transcript yet — so a client-side "did they say anything?" check
+  // silently skips evaluation on exactly the calls that mattered.
+  const repTurns = (session.transcript ?? []).filter((t) => t.speaker === 'sales_executive').length;
+  if (repTurns === 0) {
+    return { sessionId: session._id, scored: false, reason: 'no_rep_turns', durationMinutes: 0 };
+  }
+
   const durationMinutes = session.startTime
     ? Math.round((session.endTime - session.startTime) / 60000)
     : 0;
@@ -239,6 +248,7 @@ export async function endTrainingSession(sessionId) {
 
   return {
     sessionId: session._id,
+    scored: true,
     durationMinutes,
     observerOutput,
     ...coachResult,

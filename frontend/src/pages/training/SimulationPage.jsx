@@ -92,40 +92,36 @@ export default function SimulationPage() {
     lang: langConfig.speechLang,
   });
 
-  const repTurnCount = (transcript ?? []).filter((t) => t.speaker === 'sales_executive').length;
-
   /**
-   * Leaving via the back arrow used to abandon the session in 'active' state.
-   * The Observer only runs on end, so the call was never scored and the skill
-   * graph never moved — the rep had a full conversation and saw nothing change,
-   * with no indication anything was wrong. Ask before dropping that work.
+   * Back ENDS the call — it does not abandon it.
+   *
+   * This used to call navigate('/train') directly, leaving the session 'active'.
+   * The Observer only runs inside endTrainingSession, so the call was never
+   * scored and the skill graph never moved: the rep had a full conversation and
+   * saw nothing change, with nothing in the UI to say why. Leaving is the normal
+   * way people exit a call, so leaving has to be what triggers evaluation.
+   *
+   * Always ends — the SERVER decides whether there is anything to score. Do not
+   * gate this on the local transcript: on a fresh load the transcript may not
+   * have arrived yet, so a client-side turn check reads 0 and skips evaluation
+   * on precisely the calls the rep just finished.
    */
   function leaveSession() {
-    if (sessionEnded || repTurnCount === 0) {
-      navigate('/train');
-      return;
-    }
-    const scoreIt = confirm(
-      `This call has ${repTurnCount} of your turns and has NOT been scored yet.\n\n`
-      + 'OK — end the call now, get your debrief and update your skill graph.\n'
-      + 'Cancel — leave without scoring (this call will not count towards your analytics).',
-    );
-    if (scoreIt) {
-      endSession({ skipConfirm: true });
-      return;
-    }
-    navigate('/train');
+    if (sessionEnded || ending) return;
+    endSession({ skipConfirm: true });
   }
 
   async function endSession({ skipConfirm = false } = {}) {
     if (!skipConfirm && !confirm('End this simulation? Your performance will be evaluated.')) return;
     setEnding(true);
     try {
-      await trainingApi.endSession(sessionId);
+      const { data } = await trainingApi.endSession(sessionId);
       setSessionEnded(true);
-      navigate(`/train/${sessionId}/debrief`);
+      // An empty call produces no debrief — going there would 404.
+      navigate(data?.scored === false ? '/train' : `/train/${sessionId}/debrief`);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to end session');
+      setSessionEnded(false);
     } finally {
       setEnding(false);
     }
