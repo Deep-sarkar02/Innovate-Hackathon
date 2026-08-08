@@ -1,4 +1,4 @@
-import { callOpenAI, isOpenAiConfigured } from './openai.client.js';
+import { callLLM, isLlmConfigured } from './llm.client.js';
 import { SKILLS } from '../../seed/skills.seed.js';
 
 function mockObserverScores(sessionBrief, transcript) {
@@ -51,10 +51,10 @@ function mockObserverScores(sessionBrief, transcript) {
 export async function observeSession(sessionBrief, transcript) {
   const skillList = SKILLS.map((s) => s.skillId).join(', ');
 
-  if (isOpenAiConfigured() && transcript.length > 0) {
+  if (isLlmConfigured() && transcript.length > 0) {
     const transcriptText = transcript.map((t) => `${t.speaker}: ${t.text}`).join('\n');
 
-    const result = await callOpenAI(
+    const result = await callLLM(
       [
         {
           role: 'system',

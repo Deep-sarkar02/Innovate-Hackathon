@@ -1,4 +1,4 @@
-import { callOpenAI, isOpenAiConfigured } from './openai.client.js';
+import { callLLM, isLlmConfigured } from './llm.client.js';
 import { getKnowledgeForBrief } from '../cohort-kb/cohort-kb.service.js';
 
 const PERSONA_PROMPTS = {
@@ -14,10 +14,10 @@ const MOOD_MODIFIERS = {
   frustrated: 'You are frustrated from bad past experiences with other coaching centers.',
 };
 
-function buildCustomerSystemPrompt(sessionBrief, knowledge, customerState) {
+function buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, language = 'en') {
   const persona = PERSONA_PROMPTS[sessionBrief.persona] ?? PERSONA_PROMPTS.father;
   const mood = MOOD_MODIFIERS[sessionBrief.mood] ?? MOOD_MODIFIERS.neutral;
-  const lang = sessionBrief.language === 'hi' ? 'Respond in Hindi (Devanagari script).' : 'Respond in English.';
+  const lang = language === 'hi' ? 'Respond in Hindi (Devanagari script).' : 'Respond in English.';
 
   const knowledgeContext = [
     ...knowledge.objectionNodes.map((n) => `[Objection] ${n.content}`),
@@ -45,9 +45,11 @@ ${knowledgeContext || 'You know coaching is expensive and you want the best for 
 RULES:
 - You are the CUSTOMER, not the salesperson. Never offer to sell anything.
 - Never evaluate or coach the salesperson.
-- Stay in character. Raise objections naturally related to: ${sessionBrief.primaryObjection.replace(/_/g, ' ')}
+- Stay in character as a ${sessionBrief.persona} with a ${sessionBrief.mood} mood.
+- Directly respond to what the sales rep just said — reference their specific points.
+- Raise objections naturally related to: ${sessionBrief.primaryObjection.replace(/_/g, ' ')}
 - Keep responses concise (1-3 sentences). ${lang}
-- If trust increases above 70, become slightly more open. If below 30, become more resistant.`;
+- If trust is above 70, become slightly more open. If below 30, become more resistant.`;
 }
 
 function mockCustomerReply(sessionBrief, repText, customerState) {
@@ -124,6 +126,7 @@ export function updateCustomerState(customerState, repText, sessionBrief) {
 
 export async function generateCustomerReply(session, repMessage) {
   const { sessionBrief, customerState, transcript, language } = session;
+  const replyLanguage = language ?? sessionBrief.language ?? 'en';
   const knowledge = await getKnowledgeForBrief(sessionBrief);
 
   const history = transcript
@@ -131,12 +134,12 @@ export async function generateCustomerReply(session, repMessage) {
     .map((t) => `${t.speaker}: ${t.text}`)
     .join('\n');
 
-  if (isOpenAiConfigured()) {
-    const reply = await callOpenAI([
-      { role: 'system', content: buildCustomerSystemPrompt(sessionBrief, knowledge, customerState) },
+  if (isLlmConfigured()) {
+    const reply = await callLLM([
+      { role: 'system', content: buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, replyLanguage) },
       {
         role: 'user',
-        content: `Conversation so far:\n${history}\n\nSales rep just said: "${repMessage}"\n\nRespond as the customer.`,
+        content: `Conversation so far:\n${history || '(session just started)'}\n\nSales rep just said: "${repMessage}"\n\nRespond as the customer. Address their specific message about ${sessionBrief.primaryObjection.replace(/_/g, ' ')}.`,
       },
     ]);
     if (reply) return reply.trim();

@@ -25,6 +25,14 @@ export const env = {
   },
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   deepgramApiKey: process.env.DEEPGRAM_API_KEY || '',
+  bedrockApiKey:
+    process.env.BEDROCK_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK || '',
+  awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+  awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  awsSessionToken: process.env.AWS_SESSION_TOKEN || '',
+  awsProfile: process.env.AWS_PROFILE || '',
+  awsRegion: process.env.AWS_REGION || 'us-west-2',
+  bedrockModel: process.env.BEDROCK_MODEL || 'mistral.ministral-3-8b-instruct',
 };
 
 export function isLiveKitConfigured() {
@@ -39,4 +47,12 @@ export function isOpenAiConfigured() {
 export function isDeepgramConfigured() {
   const key = env.deepgramApiKey;
   return Boolean(key && !key.includes('your-deepgram'));
+}
+
+export function isBedrockConfigured() {
+  return env.bedrockApiKey.startsWith('bedrock-api-key-');
+}
+
+export function isPollyConfigured() {
+  return Boolean(env.awsAccessKeyId && env.awsSecretAccessKey);
 }

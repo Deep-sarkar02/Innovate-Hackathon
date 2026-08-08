@@ -1,11 +1,5 @@
-import OpenAI from 'openai';
-import { env, isOpenAiConfigured } from '../../config/env.js';
+import { callLLM, isLlmConfigured } from '../agents/llm.client.js';
 import { Meeting } from '../../models/Meeting.js';
-
-let openai;
-if (isOpenAiConfigured()) {
-  openai = new OpenAI({ apiKey: env.openaiApiKey });
-}
 
 const EMOTIONS = ['happy', 'interested', 'confused', 'angry', 'hesitant', 'neutral'];
 
@@ -80,24 +74,6 @@ function mockLeadScore(transcript) {
   }
 
   return { score: Math.min(100, Math.max(0, score)), reasons };
-}
-
-async function callOpenAI(messages, jsonMode = false) {
-  if (!openai) return null;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages,
-      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
-      temperature: 0.7,
-    });
-
-    return response.choices[0]?.message?.content;
-  } catch (err) {
-    console.warn('[ai] OpenAI call failed, using mock fallback:', err.message);
-    return null;
-  }
 }
 
 const HINDI_REPLIES = {
@@ -183,8 +159,8 @@ async function buildAiReply(meeting, userMessage) {
     ? 'Reply ONLY in Hindi (Devanagari script). Be concise, friendly, 1-2 sentences.'
     : 'Reply ONLY in English. Be concise, friendly, 1-2 sentences.';
 
-  if (isOpenAiConfigured()) {
-    const reply = await callOpenAI([
+  if (isLlmConfigured()) {
+    const reply = await callLLM([
       {
         role: 'system',
         content: `You are an AI sales assistant for Infinity Learn (EdTech). ${langInstruction}
@@ -236,12 +212,12 @@ export async function analyzeConversation(meetingId) {
   const transcript = meeting.transcript;
   let suggestions, emotion, leadData;
 
-  if (isOpenAiConfigured() && transcript.length > 0) {
+  if (isLlmConfigured() && transcript.length > 0) {
     const transcriptText = transcript
       .map((t) => `${t.speaker}: ${t.text}`)
       .join('\n');
 
-    const aiResult = await callOpenAI(
+    const aiResult = await callLLM(
       [
         {
           role: 'system',
@@ -317,8 +293,8 @@ export async function generateMeetingSummary(meetingId) {
 
   let summary;
 
-  if (isOpenAiConfigured() && transcriptText.length > 0) {
-    const aiResult = await callOpenAI(
+  if (isLlmConfigured() && transcriptText.length > 0) {
+    const aiResult = await callLLM(
       [
         {
           role: 'system',

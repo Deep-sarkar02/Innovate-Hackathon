@@ -77,4 +77,10 @@ export const lmsApi = {
     api.get(`/lms/${repId}/recommendations`, { params: { objective } }),
 };
 
+export const ttsApi = {
+  status: () => api.get('/tts/status'),
+  speak: (data) =>
+    api.post('/tts/speak', data, { responseType: 'arraybuffer' }),
+};
+
 export default api;

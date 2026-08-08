@@ -39,6 +39,8 @@ async function createLiveKitToken(roomId, identity, name) {
 
 export async function startTrainingSession(repId, options = {}) {
   const sessionBrief = options.sessionBrief ?? (await generateSessionBrief(repId));
+  const language = options.language ?? sessionBrief.language ?? 'en';
+  sessionBrief.language = language;
   const roomId = `train-${uuidv4().slice(0, 8)}`;
 
   const expires = new Date();
@@ -51,7 +53,7 @@ export async function startTrainingSession(repId, options = {}) {
     mode: 'training',
     sessionBrief,
     customerState: initialCustomerState(sessionBrief),
-    language: options.language ?? sessionBrief.language ?? 'en',
+    language,
     voiceGender: options.voiceGender ?? 'female',
     voicePersona: options.voicePersona ?? 'arbor',
     startTime: new Date(),

@@ -1,4 +1,4 @@
-import { callOpenAI, isOpenAiConfigured } from './openai.client.js';
+import { callLLM, isLlmConfigured } from './llm.client.js';
 import { applySkillDeltas } from '../skill-graph/skill-graph.service.js';
 import { updateLearningVelocity } from '../rep-profile/rep-profile.service.js';
 import { getRecommendationsForSkills } from '../lms-recommend/recommend.service.js';
@@ -61,8 +61,8 @@ export async function coachSession({
 
   let coachFeedback = mockCoachFeedback(sessionBrief, observerOutput, appliedDeltas);
 
-  if (isOpenAiConfigured()) {
-    const aiFeedback = await callOpenAI([
+  if (isLlmConfigured()) {
+    const aiFeedback = await callLLM([
       {
         role: 'system',
         content: `You are a Coach Agent. Provide brief, actionable feedback (2-3 sentences) for a sales rep after a training session. Never generate customer dialogue.`,
