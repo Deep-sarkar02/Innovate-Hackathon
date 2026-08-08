@@ -9,6 +9,8 @@ import RepProfilePage from './pages/profile/RepProfilePage.jsx';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage.jsx';
 import AdminCohortsPage from './pages/admin/AdminCohortsPage.jsx';
 import SetupPage from './pages/SetupPage.jsx';
+import CourseSyllabusPage from './pages/course/CourseSyllabusPage.jsx';
+import CourseItemPage from './pages/course/CourseItemPage.jsx';
 import MeetingPage from './pages/meeting/MeetingPage.jsx';
 import JoinPage from './pages/meeting/JoinPage.jsx';
 
@@ -22,6 +24,8 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/train" element={<TrainSetupPage />} />
+        <Route path="/course/:courseId" element={<CourseSyllabusPage />} />
+        <Route path="/course/:courseId/:itemId" element={<CourseItemPage />} />
         <Route path="/train/:sessionId" element={<SimulationPage />} />
         <Route path="/train/:sessionId/debrief" element={<DebriefPage />} />
         <Route path="/profile" element={<RepProfilePage />} />

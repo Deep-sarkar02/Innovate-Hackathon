@@ -64,6 +64,15 @@ export const analyticsApi = {
   getLeaderboard: () => api.get('/analytics/leaderboard'),
 };
 
+export const courseApi = {
+  list: () => api.get('/courses'),
+  syllabus: (courseId) => api.get(`/courses/${courseId}`),
+  item: (courseId, itemId) => api.get(`/courses/${courseId}/items/${itemId}`),
+  page: (courseId, itemId, page) => api.post(`/courses/${courseId}/items/${itemId}/page`, { page }),
+  checkpoint: (courseId, itemId, afterPage, answers) => api.post(`/courses/${courseId}/items/${itemId}/checkpoint`, { afterPage, answers }),
+  quiz: (courseId, itemId, answers) => api.post(`/courses/${courseId}/items/${itemId}/quiz`, { answers }),
+};
+
 export const cohortApi = {
   list: () => api.get('/cohorts'),
   get: (cohortId, version) => api.get(`/cohorts/${cohortId}`, { params: { version } }),

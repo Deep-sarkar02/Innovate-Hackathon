@@ -3,6 +3,8 @@ import { Cohort } from '../models/Cohort.js';
 import { KnowledgeNode, KnowledgeEdge } from '../models/KnowledgeNode.js';
 import { SKILLS } from './skills.seed.js';
 import { COHORTS, KNOWLEDGE_NODES, KNOWLEDGE_EDGES } from './cohorts.seed.js';
+import { Course } from '../models/Course.js';
+import { CRT_COURSE } from './crt-course.seed.js';
 
 /**
  * Idempotent, upsert-based seeding.
@@ -51,6 +53,10 @@ export async function seedDatabase() {
     );
     console.log(`[seed] Knowledge nodes: ${nodeRes.upsertedCount} inserted, ${nodeRes.modifiedCount} updated`);
   }
+  // Courses: upsert by courseId so content edits land on redeploy
+  await Course.updateOne({ courseId: CRT_COURSE.courseId }, { $set: CRT_COURSE }, { upsert: true });
+  console.log(`[seed] Course '${CRT_COURSE.courseId}': ${CRT_COURSE.days.length} days upserted`);
+
   if (KNOWLEDGE_EDGES.length > 0) {
     await KnowledgeEdge.bulkWrite(
       KNOWLEDGE_EDGES.map((e) => ({

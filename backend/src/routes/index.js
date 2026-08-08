@@ -9,6 +9,7 @@ import cohortRoutes from '../modules/cohort-kb/cohort-kb.routes.js';
 import simulationRoutes from '../modules/simulation/simulation.routes.js';
 import analyticsRoutes from '../modules/analytics/analytics.routes.js';
 import lmsRoutes from '../modules/lms-recommend/recommend.routes.js';
+import courseRoutes from '../modules/courses/course.routes.js';
 import ttsRoutes from '../modules/tts/tts.routes.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.use('/training', simulationRoutes);
 router.use('/cohorts', cohortRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/lms', lmsRoutes);
+router.use('/courses', courseRoutes);
 router.use('/tts', ttsRoutes);
 router.use('/', aiRoutes);
 

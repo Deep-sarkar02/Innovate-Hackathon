@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { GraduationCap, Play, BarChart3, User, LogOut, Library } from 'lucide-react';
+import { GraduationCap, Play, BarChart3, User, LogOut, Library, BookOpen } from 'lucide-react';
 
 /**
  * Frappe-LMS-style application shell: brand-blue left sidebar with an orange
@@ -11,6 +11,7 @@ import { GraduationCap, Play, BarChart3, User, LogOut, Library } from 'lucide-re
 
 const NAV = [
   { to: '/dashboard', label: 'Learn', icon: GraduationCap },
+  { to: '/course/crt', label: 'CRT Course', icon: BookOpen },
   { to: '/train', label: 'Practice', icon: Play },
   { to: '/profile', label: 'Profile', icon: User },
 ];

@@ -93,6 +93,14 @@ Guard-rails in the loop (don't remove):
 - Unscored skills never move
 - Diminishing returns on repeated keywords in customer state (anti-gaming)
 
+## CRT Course (drip-gated learning)
+
+`/course/crt` is a 5-day Counsellor Readiness Training course seeded from the
+real CRT schedule. Gating is SERVER-side (`modules/courses/course.service.js`):
+slides advance one page at a time, checkpoint quizzes mid-deck block later
+pages until passed, each day ends with a final quiz, and day N+1 stays locked
+until day N is fully complete. Content lives in `seed/crt-course.seed.js`.
+
 ## Team split (suggested)
 
 | Owner | Area | Files |
