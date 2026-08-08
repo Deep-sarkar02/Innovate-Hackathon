@@ -69,8 +69,13 @@ export function isTranscribeConfigured() {
 }
 
 export function isSarvamConfigured() {
-  const key = env.sarvamApiKey;
-  return Boolean(key && key.startsWith('sk_') && !key.includes('your-sarvam'));
+  const key = (env.sarvamApiKey ?? '').trim();
+  // Only reject the empty string and the .env.example placeholder. This used to
+  // also require an 'sk_' prefix, which silently rejects Sarvam's UUID-style
+  // subscription keys — the server would fall back to Polly with no error and
+  // every father persona would speak in an American voice for no visible reason.
+  // A wrong key should fail loudly at the API call, not be guessed at here.
+  return Boolean(key) && !key.includes('your-sarvam');
 }
 
 export function isKimiConfigured() {

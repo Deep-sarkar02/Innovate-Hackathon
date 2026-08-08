@@ -5,6 +5,8 @@ import { seedDemoUser } from './modules/auth/auth.controller.js';
 import { seedDatabase } from './seed/index.js';
 import { seedDemoRepProfile } from './modules/rep-profile/rep-profile.service.js';
 import { getDemoSalesExecutiveId } from './config/demoUser.js';
+import { getTtsProvider } from './modules/tts/tts.service.js';
+import { getSttProvider } from './modules/stt/stt.service.js';
 
 let server;
 let shuttingDown = false;
@@ -63,9 +65,36 @@ async function start() {
   await listenWithRetry();
 
   console.log(`[server] Adaptive Sales Training Platform API on http://localhost:${env.port}`);
+  reportVoiceProviders();
   if (env.nodeEnv !== 'production') {
     console.log('[server] Demo login: sales@infinitylearn.com (password: DEMO_USER_PASSWORD, default demo1234)');
   }
+}
+
+/**
+ * Every customer in this product is an Indian parent or student. Polly has no
+ * Indian male voice in any region, so on Polly the father personas fall back to
+ * a US voice. That used to be invisible at boot — print it, because a silently
+ * wrong voice reads as a bug in the persona rather than a missing API key.
+ */
+function reportVoiceProviders() {
+  const tts = getTtsProvider();
+  const stt = getSttProvider();
+  console.log(`[voice] TTS: ${tts}  |  STT: ${stt}`);
+
+  if (tts === 'sarvam') {
+    console.log('[voice] All personas voiced with Indian voices (aditya/rahul, priya/kavya).');
+    return;
+  }
+  if (tts === 'polly') {
+    console.warn(
+      '[voice] Polly has NO Indian male voice — father and male-student personas will speak\n'
+      + '[voice] with a US voice (Matthew). Mothers are correct (Kajal, en-IN/hi-IN).\n'
+      + '[voice] Set SARVAM_API_KEY in .env to voice every persona as Indian.',
+    );
+    return;
+  }
+  console.warn('[voice] No server TTS configured — falling back to browser voices, which on macOS have no male hi-IN voice.');
 }
 
 async function shutdown(signal) {
