@@ -92,8 +92,33 @@ export default function SimulationPage() {
     lang: langConfig.speechLang,
   });
 
-  async function endSession() {
-    if (!confirm('End this simulation? Your performance will be evaluated.')) return;
+  const repTurnCount = (transcript ?? []).filter((t) => t.speaker === 'sales_executive').length;
+
+  /**
+   * Leaving via the back arrow used to abandon the session in 'active' state.
+   * The Observer only runs on end, so the call was never scored and the skill
+   * graph never moved — the rep had a full conversation and saw nothing change,
+   * with no indication anything was wrong. Ask before dropping that work.
+   */
+  function leaveSession() {
+    if (sessionEnded || repTurnCount === 0) {
+      navigate('/train');
+      return;
+    }
+    const scoreIt = confirm(
+      `This call has ${repTurnCount} of your turns and has NOT been scored yet.\n\n`
+      + 'OK — end the call now, get your debrief and update your skill graph.\n'
+      + 'Cancel — leave without scoring (this call will not count towards your analytics).',
+    );
+    if (scoreIt) {
+      endSession({ skipConfirm: true });
+      return;
+    }
+    navigate('/train');
+  }
+
+  async function endSession({ skipConfirm = false } = {}) {
+    if (!skipConfirm && !confirm('End this simulation? Your performance will be evaluated.')) return;
     setEnding(true);
     try {
       await trainingApi.endSession(sessionId);
@@ -111,7 +136,7 @@ export default function SimulationPage() {
       <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/train')} className="p-2 rounded-full hover:bg-white/5 text-slate-400">
+            <button onClick={leaveSession} className="p-2 rounded-full hover:bg-white/5 text-slate-400">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -194,7 +219,7 @@ export default function SimulationPage() {
             lockPersona
             languageLabel={langConfig.label}
             onToggleMute={() => setIsMuted((m) => !m)}
-            onEndCall={endSession}
+            onEndCall={() => endSession()}
             ending={ending}
           />
         )}

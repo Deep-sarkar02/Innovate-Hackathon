@@ -2,6 +2,11 @@ import { UserSkillProgress } from '../../models/UserSkillProgress.js';
 import { SkillUpdate } from '../../models/SkillUpdate.js';
 import { Skill } from '../../models/Skill.js';
 
+// Where a rep starts on a skill they have never practised. Matches the default
+// coach.agent.js assumes (`graphMap[skillId] ?? 50`), so a first session moves
+// from the same baseline the Coach scored against.
+const BASELINE_SCORE = 50;
+
 export async function getSkillGraphForUser(userId) {
   const progress = await UserSkillProgress.find({ userId }).lean();
   const skills = await Skill.find().lean();
@@ -58,8 +63,12 @@ export async function applySkillDeltas(userId, sessionId, deltas) {
   const now = new Date();
 
   for (const { skillId, delta, reason } of deltas) {
-    const progress = progressMap[skillId];
-    if (!progress) continue;
+    // A rep who has never practised this skill has no row yet. Previously this
+    // did `if (!progress) continue`, and the write below had no upsert — so for
+    // a new rep EVERY delta was silently dropped and no row was ever created.
+    // The graph could never bootstrap: sessions ran, the Observer scored, and
+    // the analytics stayed permanently empty with no error anywhere.
+    const progress = progressMap[skillId] ?? { score: BASELINE_SCORE };
 
     const previousScore = progress.score;
     const newScore = Math.max(0, Math.min(100, previousScore + delta));
@@ -76,7 +85,13 @@ export async function applySkillDeltas(userId, sessionId, deltas) {
     };
     if (newScore >= 80 && improvementStreak >= 3) set.masteredAt = now;
 
-    bulkOps.push({ updateOne: { filter: { userId, skillId }, update: { $set: set } } });
+    bulkOps.push({
+      updateOne: {
+        filter: { userId, skillId },
+        update: { $set: set },
+        upsert: true, // create the row on first practice — see the note above
+      },
+    });
     logDocs.push({ userId, sessionId, skillId, previousScore, newScore, delta, reason });
     updates.push({ skillId, previousScore, newScore, delta });
   }
