@@ -2,6 +2,8 @@
  * Sarvam Bulbul v3 — Indian-market voices (en-IN / hi-IN).
  * @see https://docs.sarvam.ai/api-reference/text-to-speech/convert
  */
+import { genderForPersona } from '../tts/persona-gender.js';
+
 export const SARVAM_VOICES = {
   en: {
     female: {
@@ -31,9 +33,8 @@ export const SARVAM_VOICES = {
 
 export function resolveSarvamVoice(language = 'en', voiceGender = 'female', persona = null) {
   const lang = language === 'hi' ? 'hi' : 'en';
-  let gender = voiceGender === 'male' ? 'male' : 'female';
-  if (persona === 'mother') gender = 'female';
-  else if (persona === 'father') gender = 'male';
+  // Same rule as Polly — parents forced by role, students follow the child.
+  const gender = genderForPersona(voiceGender, persona);
   return SARVAM_VOICES[lang][gender] ?? SARVAM_VOICES.en.female;
 }
 

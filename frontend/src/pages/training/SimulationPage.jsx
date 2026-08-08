@@ -42,9 +42,6 @@ export default function SimulationPage() {
   const [ending, setEnding] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
 
-  const language = location.state?.language ?? sessionData?.sessionBrief?.language ?? 'en';
-  const langConfig = getLanguageConfig(language);
-
   const handleCustomerReplyRef = useRef(null);
 
   const { transcript, customerState, sessionBrief, thinking, aiMode, stateDeltas, appendTurn } = useTrainingSession(sessionId, {
@@ -53,6 +50,14 @@ export default function SimulationPage() {
   });
 
   const brief = sessionBrief ?? sessionData?.sessionBrief;
+
+  // Derive language from the FETCHED brief, not just navigation state.
+  // sessionData lives in location.state, which is empty on a direct link or a
+  // page reload — so this used to fall back to 'en' on a Hindi session and hand
+  // Hindi text to an English voice.
+  const language = location.state?.language ?? brief?.language ?? 'en';
+  const langConfig = getLanguageConfig(language);
+
   const customerPersona = brief?.persona ?? brief?.personaRole ?? 'father';
   const customerVoice = brief?.voiceGender
     ?? (customerPersona === 'mother' ? 'female' : customerPersona === 'father' ? 'male' : 'female');

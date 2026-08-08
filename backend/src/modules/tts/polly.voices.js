@@ -21,6 +21,8 @@
  * DOES provide Indian male voices — aditya (en-IN) and rahul (hi-IN).
  * tts.service.js already prefers Sarvam when it is configured.
  */
+import { genderForPersona } from './persona-gender.js';
+
 export const POLLY_VOICES = {
   en: {
     female: {
@@ -67,10 +69,9 @@ export const POLLY_VOICES = {
 
 export function resolvePollyVoice(language = 'en', voiceGender = 'female', persona = null) {
   const lang = language === 'hi' ? 'hi' : 'en';
-  // Persona role overrides manual gender so the voice matches the character.
-  let gender = voiceGender === 'male' ? 'male' : 'female';
-  if (persona === 'mother') gender = 'female';
-  else if (persona === 'father' || persona === 'student') gender = 'male';
+  // Parent roles override the caller's gender; students keep theirs (it follows
+  // the child's gender). See persona-gender.js.
+  const gender = genderForPersona(voiceGender, persona);
 
   const voice = POLLY_VOICES[lang][gender] ?? POLLY_VOICES.en.female;
   if (voice.warning) console.warn('[polly]', voice.warning);
