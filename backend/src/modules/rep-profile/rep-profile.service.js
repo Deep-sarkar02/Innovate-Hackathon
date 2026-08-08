@@ -28,7 +28,6 @@ const DEFAULT_SKILL_SCORES = {
   closing: 37,
   follow_up: 60,
   neet_specific: 72,
-  dropper_handling: 68,
   parent_engagement: 58,
 };
 
@@ -40,7 +39,9 @@ export async function getOrCreateRepProfile(userId) {
       city: 'Hyderabad',
       region: 'South',
       language: 'hi',
-      cohortAssignments: ['NEET_Dropper_v2'],
+      // No hardcoded cohort — the planner places reps on the empirical
+      // difficulty ladder (see pickCohortForLevel) unless explicitly assigned.
+      cohortAssignments: [],
       quizOutcomes: DEFAULT_QUIZ_OUTCOMES,
       learningVelocity: 0.12,
     });

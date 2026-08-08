@@ -24,6 +24,10 @@ export const env = {
     apiSecret: process.env.LIVEKIT_API_SECRET || '',
   },
   openaiApiKey: process.env.OPENAI_API_KEY || '',
+  // Demo accounts are auto-created at boot; password comes from env so the
+  // hardcoded default cannot leak into a deployed instance.
+  demoUserPassword: process.env.DEMO_USER_PASSWORD || 'demo1234',
+  seedDemoUsers: process.env.SEED_DEMO_USERS !== 'false',
   deepgramApiKey: process.env.DEEPGRAM_API_KEY || '',
   bedrockApiKey:
     process.env.BEDROCK_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK || '',

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ProtectedRoute, PublicRoute } from './components/RouteGuards.jsx';
+import { ProtectedRoute, PublicRoute, AdminRoute } from './components/RouteGuards.jsx';
 import LoginPage from './pages/auth/LoginPage.jsx';
 import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import TrainSetupPage from './pages/training/TrainSetupPage.jsx';
@@ -25,6 +25,9 @@ export default function App() {
         <Route path="/train/:sessionId" element={<SimulationPage />} />
         <Route path="/train/:sessionId/debrief" element={<DebriefPage />} />
         <Route path="/profile" element={<RepProfilePage />} />
+      </Route>
+
+      <Route element={<AdminRoute />}>
         <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
         <Route path="/admin/cohorts" element={<AdminCohortsPage />} />
       </Route>

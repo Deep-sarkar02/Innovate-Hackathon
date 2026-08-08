@@ -21,7 +21,8 @@ export function optionalAuth(req, _res, next) {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     try {
-      req.user = jwt.verify(header.slice(7), env.jwtSecret);
+      const payload = jwt.verify(header.slice(7), env.jwtSecret);
+      req.user = { ...payload, id: payload.userId };
     } catch {
       // ignore invalid token
     }

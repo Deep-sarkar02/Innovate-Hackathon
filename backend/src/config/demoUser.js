@@ -1,3 +1,4 @@
+import { env } from './env.js';
 import { User } from '../models/User.js';
 
 let demoUserId = null;
@@ -10,7 +11,7 @@ export async function getDemoSalesExecutiveId() {
     user = await User.create({
       name: 'Sales Copilot',
       email: 'sales@infinitylearn.com',
-      password: 'demo1234',
+      password: env.demoUserPassword,
       role: 'sales_executive',
     });
   }

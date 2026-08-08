@@ -39,6 +39,11 @@ const sessionInsightSchema = new mongoose.Schema(
       },
     ],
     observerScores: { type: Map, of: Number },
+    // 'llm' = real model evaluation; 'mock' = deterministic keyword heuristic.
+    // Mock-mode insights carry low confidence and must be visually flagged.
+    evaluationMode: { type: String, enum: ['llm', 'mock'], default: 'mock' },
+    // Verbatim transcript quotes backing each score (LLM mode only)
+    evidenceQuotes: { type: Map, of: String },
   },
   { timestamps: true }
 );

@@ -33,8 +33,8 @@ router.get('/:cohortId', authenticate, async (req, res, next) => {
 
 router.get('/:cohortId/knowledge', authenticate, async (req, res, next) => {
   try {
-    const version = parseInt(req.query.version ?? '2', 10);
-    const objection = req.query.objection ?? 'high_fees';
+    const version = parseInt(req.query.version ?? '1', 10);
+    const objection = req.query.objection ?? 'financial_constraint';
     const knowledge = await getRelevantKnowledge(objection, req.params.cohortId, version);
     res.json(knowledge);
   } catch (err) {

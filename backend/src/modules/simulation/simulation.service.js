@@ -85,11 +85,16 @@ export async function appendTrainingTurn(sessionId, { speaker, text }) {
   session.transcript.push({ speaker, text, timestamp: new Date() });
 
   let customerReply = null;
+  let aiMode = null;
   if (speaker === 'sales_executive') {
+    // State is updated exactly ONCE per rep turn, here. (The old mock reply
+    // also mutated state internally, double-applying every effect.)
     session.customerState = updateCustomerState(session.customerState, text, session.sessionBrief);
-    const replyText = await generateCustomerReply(session, text);
-    if (replyText) {
-      customerReply = { speaker: 'customer', text: replyText, timestamp: new Date() };
+    session.markModified('customerState');
+    const reply = await generateCustomerReply(session, text);
+    if (reply?.text) {
+      aiMode = reply.mode;
+      customerReply = { speaker: 'customer', text: reply.text, timestamp: new Date() };
       session.transcript.push(customerReply);
     }
   }
@@ -100,6 +105,9 @@ export async function appendTrainingTurn(sessionId, { speaker, text }) {
     transcript: session.transcript,
     customerReply,
     customerState: session.customerState,
+    // 'llm' | 'mock' — lets the UI show a SIMULATION MODE badge instead of
+    // silently presenting canned replies as AI.
+    aiMode,
   };
 }
 

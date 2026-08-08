@@ -3,40 +3,76 @@ import { SessionInsight } from '../../models/SessionInsight.js';
 import { UserSkillProgress } from '../../models/UserSkillProgress.js';
 import { getWeakestSkills } from '../skill-graph/skill-graph.service.js';
 import { getOrCreateRepProfile } from '../rep-profile/rep-profile.service.js';
+import { COHORT_LADDER } from '../../seed/cohorts.seed.js';
 
 const SKILL_THRESHOLD = 60;
 const MAX_FAILURES_BEFORE_ROTATE = 5;
 const QUIZ_WEAK_THRESHOLD = 70;
 
+// Personas per objective — parents dominate because the real funnel is 86%
+// grade 1-8 (the buyer is always a parent there). 'student' only appears for
+// board-year style objectives; 'both_parents' trains multi-decision-maker
+// calls (18.6% of real demos have both parents present).
 const PERSONA_MAP = {
-  pricing: ['father', 'mother'],
-  scholarship: ['father', 'student'],
-  closing: ['student', 'mother'],
-  objection_handling: ['father', 'student'],
-  need_discovery: ['student', 'mother'],
-  competitor_comparison: ['father', 'student'],
-  parent_engagement: ['father', 'mother'],
+  pricing: ['father', 'mother', 'both_parents'],
+  emi_plans: ['father', 'mother'],
+  scholarship: ['father', 'mother'],
+  closing: ['father', 'both_parents'],
+  objection_handling: ['father', 'mother'],
+  need_discovery: ['mother', 'father'],
+  competitor_comparison: ['father', 'both_parents'],
+  trust_building: ['mother', 'both_parents'],
+  urgency_creation: ['mother', 'father'],
+  demo_pitch: ['mother', 'father'],
+  value_proposition: ['father', 'both_parents'],
+  greeting: ['father', 'mother'],
 };
 
+// Objective -> objection, REAL taxonomy with real frequencies:
+// financial_constraint 52.1% | need_time 28.2% | trust_deficit 8.3%
+// family_consultation 6.8% | competitor_locked 4.6%
 const OBJECTION_MAP = {
-  pricing: 'high_fees',
-  scholarship: 'scholarship_not_enough',
-  closing: 'need_to_think',
-  objection_handling: 'already_tried_coaching',
-  competitor_comparison: 'competitor_cheaper',
-  parent_engagement: 'need_parent_approval',
-  neet_specific: 'online_is_enough',
+  pricing: 'financial_constraint',
+  emi_plans: 'financial_constraint',
+  scholarship: 'financial_constraint',
+  closing: 'need_time',
+  urgency_creation: 'need_time',
+  objection_handling: 'financial_constraint',
+  competitor_comparison: 'competitor_locked',
+  trust_building: 'trust_deficit',
+  demo_pitch: 'need_time',
+  need_discovery: 'financial_constraint',
+  value_proposition: 'trust_deficit',
+  greeting: 'need_time',
 };
 
 const GOAL_TEMPLATES = {
-  pricing: 'Can rep overcome pricing objection and move to closing?',
-  scholarship: 'Can rep explain scholarship options and build value?',
-  closing: 'Can rep successfully close and get commitment?',
-  objection_handling: 'Can rep handle objections using LAER framework?',
-  competitor_comparison: 'Can rep differentiate against competitors?',
-  parent_engagement: 'Can rep engage parent and address their concerns?',
-  need_discovery: 'Can rep uncover student needs through effective questioning?',
+  pricing: 'Can rep hold price for late in the call and translate it to a monthly EMI? (75.6% of real deals are financed)',
+  emi_plans: 'Can rep convert an annual price into a concrete EMI plan the parent accepts?',
+  scholarship: 'Can rep keep discount as the LAST lever instead of leading with it?',
+  closing: 'Can rep convert "need time to think" into a concrete commitment?',
+  objection_handling: 'Can rep handle the financial objection without immediately discounting?',
+  competitor_comparison: 'Can rep displace an existing tuition/coaching without rubbishing it?',
+  trust_building: 'Can rep build trust with test-report evidence and concrete proof?',
+  urgency_creation: 'Can rep create legitimate urgency (selection framing) with no exam deadline?',
+  need_discovery: 'Can rep diagnose the child\'s gap before pitching?',
+  demo_pitch: 'Can rep drive to a demo booking? (90+ min demos close at 21.5% vs <7% for shorter)',
+  value_proposition: 'Can rep tie every rupee to the diagnosed gap?',
 };
+
+/**
+ * Cohort placement walks the EMPIRICAL difficulty ladder (by real sale rate):
+ * east_belt_middle (16.8%) → premium_school → board_year → mainstream_middle
+ * → early_grade_value (9.0%). New reps start on the easiest rung; average
+ * grounded-skill score moves them up. Exported pure for unit tests.
+ */
+export function pickCohortForLevel(avgSkillScore) {
+  if (avgSkillScore == null || avgSkillScore < 45) return COHORT_LADDER[0];
+  if (avgSkillScore < 55) return COHORT_LADDER[1];
+  if (avgSkillScore < 65) return COHORT_LADDER[2];
+  if (avgSkillScore < 75) return COHORT_LADDER[3];
+  return COHORT_LADDER[4];
+}
 
 function pickObjective(weakestSkills, quizOutcomes, progressRecords) {
   const candidates = [];
@@ -112,22 +148,34 @@ export async function generateSessionBrief(repId) {
     }
   }
 
-  const cohortKey = profile.cohortAssignments?.[0] ?? 'NEET_Dropper_v2';
+  // Cohort: explicit assignment wins; otherwise place the rep on the
+  // empirical difficulty ladder by their average grounded-skill score.
+  const allScores = weakestSkills.map((s) => s.score);
+  const avgSkill = allScores.length
+    ? allScores.reduce((a, b) => a + b, 0) / allScores.length
+    : null;
+  const assigned = profile.cohortAssignments?.[0];
+  const cohortKey = assigned ?? pickCohortForLevel(avgSkill);
   const [cohortId, versionStr] = cohortKey.includes('_v')
-    ? [cohortKey.replace(/_v\d+$/, ''), parseInt(cohortKey.match(/_v(\d+)$/)?.[1] ?? '2', 10)]
-    : [cohortKey, 2];
+    ? [cohortKey.replace(/_v\d+$/, ''), parseInt(cohortKey.match(/_v(\d+)$/)?.[1] ?? '1', 10)]
+    : [cohortKey, null];
 
-  const cohort = await Cohort.findOne({ cohortId, version: versionStr, isActive: true }).lean()
-    ?? await Cohort.findOne({ cohortId, isActive: true }).sort({ version: -1 }).lean();
+  const cohort = (versionStr
+    ? await Cohort.findOne({ cohortId, version: versionStr }).lean()
+    : null)
+    ?? await Cohort.findOne({ cohortId, isActive: true }).sort({ version: -1 }).lean()
+    ?? await Cohort.findOne({ isActive: true }).sort({ cohortId: 1, version: -1 }).lean();
 
   const objective = pickObjective(weakestSkills, quizOutcomes, progressRecords);
   const targetSkill = weakestSkills.find((s) => s.skillId === objective) ?? weakestSkills[0];
   const difficulty = computeDifficulty(objective, targetSkill?.score ?? 50, cohort?.difficultyPresets);
   const persona = pickPersona(objective, cohort ?? { personas: ['father'] });
   const mood = pickMood(difficulty);
+  // Prefer the cohort's own objection mix when the objective has no strong
+  // mapping — cohorts carry the REAL per-segment distributions.
   const primaryObjection = OBJECTION_MAP[objective]
     ?? cohort?.commonObjections?.[0]
-    ?? 'high_fees';
+    ?? 'financial_constraint';
 
   return {
     objective,
@@ -137,8 +185,11 @@ export async function generateSessionBrief(repId) {
     primaryObjection,
     goal: GOAL_TEMPLATES[objective] ?? `Can rep demonstrate proficiency in ${objective}?`,
     cohortId: cohort?.cohortId ?? cohortId,
-    cohortVersion: cohort?.version ?? versionStr,
-    customerName: persona === 'student' ? 'Rahul' : persona === 'mother' ? 'Mrs. Sharma' : 'Mr. Sharma',
+    cohortVersion: cohort?.version ?? versionStr ?? 1,
+    customerName:
+      persona === 'student' ? 'Rahul'
+        : persona === 'both_parents' ? 'Mr. & Mrs. Sharma'
+          : persona === 'mother' ? 'Mrs. Sharma' : 'Mr. Sharma',
     language: profile.language ?? 'en',
     city: profile.city ?? 'Hyderabad',
     region: profile.region ?? 'South',

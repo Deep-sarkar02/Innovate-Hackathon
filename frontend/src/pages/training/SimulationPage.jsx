@@ -49,7 +49,7 @@ export default function SimulationPage() {
 
   const handleCustomerReply = useCallback((text) => speak(text), [speak]);
 
-  const { transcript, customerState, sessionBrief, thinking, appendTurn } = useTrainingSession(sessionId, {
+  const { transcript, customerState, sessionBrief, thinking, aiMode, appendTurn } = useTrainingSession(sessionId, {
     enabled: !sessionEnded,
     onCustomerReply: handleCustomerReply,
   });
@@ -84,7 +84,7 @@ export default function SimulationPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate('/train')} className="p-2 rounded-full hover:bg-white/5 text-slate-400">
@@ -92,7 +92,7 @@ export default function SimulationPage() {
             </button>
             <div>
               <h1 className="text-sm font-medium">Training Simulation</h1>
-              <p className="text-xs text-slate-500 capitalize">{brief?.objective?.replace(/_/g, ' ')} · {brief?.persona}</p>
+              <p className="text-xs text-slate-500 capitalize">{brief?.objective?.replace(/_/g, ' ')} · {brief?.persona?.replace(/_/g, ' ')}</p>
             </div>
           </div>
           {liveActive && <SessionTimer startTime={sessionData?.startTime} />}
@@ -110,14 +110,27 @@ export default function SimulationPage() {
       )}
 
       <main className="max-w-6xl mx-auto px-4 py-6">
+        {aiMode === 'mock' && (
+          <div className="mb-4 rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+            ⚠ SIMULATION MODE — the AI service is unavailable, so customer replies and scoring
+            are deterministic stand-ins. Check OPENAI_API_KEY / the /health endpoint.
+          </div>
+        )}
         {brief && (
           <div className="mb-6">
             <SessionBriefCard sessionBrief={brief} />
           </div>
         )}
 
+        {liveActive && (!supported || speechError) && (
+          <div className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-300">
+            🎙 Voice is unavailable ({!supported ? 'browser does not support speech recognition' : 'microphone blocked'}).
+            Continue the conversation by typing below — scoring works the same.
+          </div>
+        )}
         {liveActive && (
           <LiveVoiceSession
+            compact={!supported || Boolean(speechError)}
             connected={isConnected || demoMode}
             muted={isMuted}
             listening={listening && supported}

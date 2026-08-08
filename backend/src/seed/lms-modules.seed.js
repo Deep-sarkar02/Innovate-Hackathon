@@ -75,7 +75,7 @@ export const LMS_MODULES = [
     moduleId: 'neet_mastery',
     title: 'NEET Sales Mastery',
     description: 'Cohort-specific pitch for NEET aspirants',
-    skills: ['neet_specific', 'dropper_handling'],
+    skills: ['neet_specific'],
     durationMinutes: 30,
     url: '/lms/neet-mastery',
   },
