@@ -6,19 +6,28 @@ import { getCleanMicrophoneStream, rmsLevel } from '../utils/audioCleanup.js';
 const SILENCE_THRESHOLD = 0.014;
 const SILENCE_MS = 1400;
 const MIN_SPEECH_MS = 450;
+const MAX_SPEECH_MS = 28000;
 const POLL_MS = 80;
+const MAX_PCM_BYTES = 16000 * 2 * 28;
 
 function languageCode(lang) {
   return lang.startsWith('hi') ? 'hi' : 'en';
 }
 
-export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales_executive', lang = 'en-US' }) {
+export function useTranscribeSpeech({
+  onResult,
+  onFailure,
+  enabled = true,
+  speaker = 'sales_executive',
+  lang = 'en-US',
+  provider = 'sarvam',
+} = {}) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
   const [error, setError] = useState(null);
-  const [provider] = useState('transcribe');
 
   const onResultRef = useRef(onResult);
+  const onFailureRef = useRef(onFailure);
   const rawStreamRef = useRef(null);
   const cleanStreamRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -37,6 +46,10 @@ export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales
   }, [onResult]);
 
   useEffect(() => {
+    onFailureRef.current = onFailure;
+  }, [onFailure]);
+
+  useEffect(() => {
     enabledRef.current = enabled;
   }, [enabled]);
 
@@ -52,6 +65,61 @@ export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales
     }
 
     let cancelled = false;
+    let mimeType = '';
+
+    function finalizeUtterance({ minSpeechMs = MIN_SPEECH_MS } = {}) {
+      if (!isSpeakingRef.current || processingRef.current) return;
+
+      const speechMs = Date.now() - (speechStartRef.current ?? Date.now());
+      isSpeakingRef.current = false;
+      silenceStartRef.current = null;
+      speechStartRef.current = null;
+
+      const recorder = recorderRef.current;
+      recorderRef.current = null;
+      if (!recorder || recorder.state === 'inactive') return;
+
+      if (speechMs < minSpeechMs) {
+        chunksRef.current = [];
+        return;
+      }
+
+      processingRef.current = true;
+
+      recorder.onstop = async () => {
+        try {
+          const blob = new Blob(chunksRef.current, { type: mimeType });
+          chunksRef.current = [];
+          if (blob.size < 1000) return;
+
+          let pcm = await blobToCleanPcm16kMono(blob);
+          if (pcm.length < 3200) return;
+          if (pcm.length > MAX_PCM_BYTES) {
+            pcm = pcm.slice(0, MAX_PCM_BYTES);
+          }
+
+          const { data } = await sttApi.transcribe({
+            audio: pcmToBase64(pcm),
+            language: languageCode(lang),
+          });
+          if (data.text?.trim()) {
+            onResultRef.current(speaker, data.text.trim());
+          }
+        } catch (err) {
+          const status = err.response?.status;
+          const message = err.response?.data?.error || err.message || 'Transcription failed';
+          const retryable = !status || status >= 500 || status === 413 || message.includes('ECONNRESET');
+          if (retryable) {
+            setError(message);
+            onFailureRef.current?.(message);
+          }
+        } finally {
+          processingRef.current = false;
+        }
+      };
+
+      recorder.stop();
+    }
 
     async function start() {
       try {
@@ -67,7 +135,7 @@ export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales
         audioContextRef.current = audioContext;
         analyserRef.current = analyser;
 
-        const mimeType = getSupportedRecorderMimeType();
+        mimeType = getSupportedRecorderMimeType();
         if (!mimeType) {
           setSupported(false);
           setError('MediaRecorder not supported in this browser');
@@ -82,6 +150,14 @@ export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales
 
           const level = rmsLevel(analyserRef.current);
           const speaking = level > SILENCE_THRESHOLD;
+
+          if (isSpeakingRef.current && speechStartRef.current) {
+            const speechMs = Date.now() - speechStartRef.current;
+            if (speechMs >= MAX_SPEECH_MS) {
+              finalizeUtterance();
+              return;
+            }
+          }
 
           if (speaking) {
             silenceStartRef.current = null;
@@ -108,46 +184,7 @@ export function useTranscribeSpeech({ onResult, enabled = true, speaker = 'sales
 
           if (Date.now() - silenceStartRef.current < SILENCE_MS) return;
 
-          const speechMs = Date.now() - (speechStartRef.current ?? Date.now());
-          isSpeakingRef.current = false;
-          silenceStartRef.current = null;
-          speechStartRef.current = null;
-
-          const recorder = recorderRef.current;
-          recorderRef.current = null;
-          if (!recorder || recorder.state === 'inactive') return;
-
-          if (speechMs < MIN_SPEECH_MS) {
-            chunksRef.current = [];
-            return;
-          }
-
-          processingRef.current = true;
-
-          recorder.onstop = async () => {
-            try {
-              const blob = new Blob(chunksRef.current, { type: mimeType });
-              chunksRef.current = [];
-              if (blob.size < 1000) return;
-
-              const pcm = await blobToCleanPcm16kMono(blob);
-              if (pcm.length < 3200) return;
-
-              const { data } = await sttApi.transcribe({
-                audio: pcmToBase64(pcm),
-                language: languageCode(lang),
-              });
-              if (data.text?.trim()) {
-                onResultRef.current(speaker, data.text.trim());
-              }
-            } catch (err) {
-              setError(err.response?.data?.error || err.message || 'Transcription failed');
-            } finally {
-              processingRef.current = false;
-            }
-          };
-
-          recorder.stop();
+          finalizeUtterance();
         }, POLL_MS);
       } catch (err) {
         if (err.name === 'NotAllowedError') {

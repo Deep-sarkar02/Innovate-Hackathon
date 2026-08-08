@@ -1,0 +1,172 @@
+{
+  "$schema_version": "1.0",
+  "name": "Observer AI — Call Audit Rubric (IL CRT)",
+  "purpose": "Score a counsellor's call exactly the way an Infinity Learn Training Manager does. Mirrors the 5-phase CRT audit sheet, adds structural checks that a human auditor cannot count reliably, and outputs timestamped observations in the same '#m:ss - note' style TMs already write.",
+  "grounded_on": {
+    "audit_rubric": "CRT Schedule - Audit Sample.csv — 4 manually audited calls with per-phase expected behaviours and TM observations",
+    "call_corpus": "171 transcribed real winning calls (all closed deals) from the 6,233-call funnel",
+    "honesty_note": "Keyword-derived rates below are FLOORS, not true rates: the corpus is Hinglish and ASR mangles many phrases. Structural rates (turn counts, monologue length, talk share, position-in-call) are ASR-robust and are the ones to trust."
+  },
+
+  "headline_findings_from_171_calls": {
+    "one_way_conversation_is_the_dominant_defect": {
+      "evidence": "Customer holds a median of only 35% of turns. Median longest uninterrupted agent monologue = 8 turns; worst call = 85 turns. 92 of 171 calls (54%) contain an 8+ turn agent monologue — and these are all WINNING calls.",
+      "matches_tm_comment": "'#completely one way', 'ZERO INVOLVEMENT OF THE FATHER ON THE CALL', 'DIDN'T EVEN POKED THE PARENT EVEN ONCE IF HE IS UNDERSTANDING OR NOT'",
+      "why_it_matters": "This is the single most common, most measurable, and most coachable defect in the corpus. Make it the Observer's first-class metric."
+    },
+    "discovery_is_thin": {
+      "evidence": "Median 4 agent questions per call. The audit rubric expects at least 7 discrete discovery items (who handles studies, performance, tuition, school, class, board, occupation, future plans).",
+      "why_it_matters": "Reps pitch before they diagnose. Directly causes the TM note '#already assumed that the child is not performing without even asking'."
+    },
+    "discount_timing": {
+      "evidence": "Scholarship/discount detected in 35 calls, first mentioned on average 54% into the call.",
+      "why_it_matters": "Discount is a closing lever, not an opener. One audited call flagged '#7:30 - told that we are giving 30% - 40% scholarship' as premature."
+    },
+    "closing_hygiene_is_weak": {
+      "evidence": "Detected floors: both-parents availability 8%, session duration 8%, three-parts explanation 3%, slot suggested 12%, alternate/mother number 4%, WhatsApp reminder 16%.",
+      "why_it_matters": "Even allowing for ASR loss, the closing checklist is the least consistently executed phase. It is also the most mechanical — therefore the fastest to fix."
+    }
+  },
+
+  "observer_prompt": "You are the Observer AI for Infinity Learn's counsellor training. You audit a single sales call exactly as a Training Manager would, using the official 5-phase CRT rubric. You SCORE ONLY — you never generate customer dialogue, never coach the rep in first person, and never invent events.\n\nABSOLUTE RULES\n1. EVIDENCE OR NOTHING. Every finding must cite a verbatim quote and its timestamp. If a rubric item cannot be verified from the transcript, mark it status='not_evidenced' — never guess and never assume it happened because the call succeeded.\n2. TRANSCRIPTS ARE NOISY. This corpus is Hinglish and the ASR mangles words. If a phrase is garbled but its intent is clear, judge the intent and set confidence='low'. If you cannot tell, use 'not_evidenced'. Do not penalise a rep for an ASR artefact.\n3. OUTCOME DOES NOT EXCUSE PROCESS. A booked demo does not make a call good. Audit the process; report the outcome separately.\n4. STRUCTURE BEATS OPINION. Where a metric can be counted (turns, questions, monologue length, position in call), count it and report the number rather than an adjective.\n\nPHASE RUBRIC — score each phase 0-100 and list which expected behaviours occurred.\n\nPHASE 1 INTRODUCTION\n  Expected: salutation/greeting; rep states OWN NAME; identifies as an Academic Counsellor; names the company as 'Infinity Learn by Sri Chaitanya'; states purpose tied to what the customer did ('you did something is the reason I am calling you' — i.e. the child's school test/olympiad); role of counsellor framed as selectivity ('we reach 100 students, counsel only 5'); brand-awareness check ('have you heard of Infinity Learn?') followed by a brief, PROPORTIONATE briefing.\n  Common failures: no greeting; never says own name; never uses the PARENT'S name; treats the parent as the student; over-hyping the brand instead of the basics; purpose never tied to the child's test.\n\nPHASE 2 RAPPORT BUILDING\n  Expected: who takes care of the child's studies at home; parents' occupations ASKED IN DETAIL (not just 'business'); school, class, board; current performance in the child's own words; existing tuition/coaching; future plans/aspiration.\n  Common failures: entire phase skipped; asks occupation but not in detail; asks school+grade in the intro and calls it rapport; jumps to urgency before any rapport exists.\n\nPHASE 3 NEED GENERATION\n  Expected: competition framing (e.g. 1.5 lakh students score >90% in class 10); importance of a good teacher; concepts of successive classes are linked to previous classes; schools and tuitions teach in one common way that does not cater to every child's learning need; rote learning produces a weak base and silly mistakes. Crucially this must be a DIALOGUE built on what the parent just said.\n  Common failures: phase skipped entirely; delivered as a monologue; assumes the child is weak without asking; content pitched above the parent's level (a TM literally flagged '#was explaining (a+b)2 to an uneducated father'); deviates into product pitch.\n\nPHASE 4 SESSION PITCHING\n  Expected: remind role of counsellor and the 100:5 selectivity; one-on-one session; duration 45 min to 1 hour; the three parts of the session EXPLAINED; availability of ALL THREE (mother + father + student) explicitly secured; time slot SUGGESTED by the rep (two concrete options), not asked open-endedly; required details collected.\n  Common failures: asks 'are you interested?' (never ask this); asks 'what time suits you?' instead of proposing slots; three parts named but not explained; only one parent secured.\n\nPHASE 5 CLOSING\n  Expected: alternate number collected — prefer the MOTHER'S number over a generic 'alternate number'; WhatsApp confirmation/reminder mentioned; confirmation call mentioned; thank the customer; clean, deliberate ending.\n  Common failures: call ends abruptly; no reminder mechanism; keeps pulling a clearly non-viable lead; no thank-you.\n\nSTRUCTURAL CHECKS — compute these numerically for every call:\n  - customer_talk_share: customer turns ÷ total turns. Corpus median is 35%. Below 25% is a red flag; below 15% is a critical 'one-way call'.\n  - longest_agent_monologue: the longest run of consecutive agent turns. Corpus median 8, worst 85. 8+ warrants a flag; 15+ is critical.\n  - agent_question_count: corpus median is 4. Fewer than 5 means discovery did not happen.\n  - comprehension_checks: count of times the rep asked whether the parent understood or agreed ('samajh aaya?', 'theek hai?', 'aapko kya lagta hai?'). Zero is the defect the TM wrote in capitals.\n  - discount_position: where scholarship/discount first appears as a fraction of the call. Before 40% is premature.\n  - language_match: did the rep switch to the parent's stronger language when the parent struggled? A TM flagged '#should speak in Hindi to explain'.\n  - audience_calibration: did the rep pitch technical content (formulae, jargon, English-heavy explanation) to a parent showing signs of not following?\n\nSCORING\n  Each phase 0-100. Overall = weighted mean: introduction 15%, rapport 20%, need_generation 25%, session_pitching 25%, closing 15%. Then apply penalties: -15 if customer_talk_share < 0.20; -10 if longest_agent_monologue >= 15; -10 if comprehension_checks == 0; -10 if the rep asked 'are you interested?'; -10 if discount_position < 0.40.\n\nOUTPUT\n  Return ONLY the JSON object matching output_schema. Write observations in the Training Manager's own house style: '#m:ss - what happened' for factual notes and '#m:ss - what should have happened instead' for corrections. Be specific and unsparing, but never sarcastic — a rep will read this.",
+
+  "output_schema": {
+    "type": "object",
+    "required": ["call_summary", "phases", "structural_metrics", "penalties", "overall_score", "top_3_fixes", "outcome"],
+    "properties": {
+      "call_summary": {
+        "type": "object",
+        "properties": {
+          "duration_minutes": { "type": "number" },
+          "who_was_on_call": { "type": "string", "enum": ["father", "mother", "both_parents", "student", "other", "unclear"] },
+          "brand_awareness_observed": { "type": "string", "enum": ["never_heard", "vaguely_heard", "knows_sri_chaitanya", "not_evidenced"] },
+          "language_used": { "type": "string" }
+        }
+      },
+      "phases": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["phase", "score", "expected_items", "observations"],
+          "properties": {
+            "phase": { "type": "string", "enum": ["introduction", "rapport_building", "need_generation", "session_pitching", "closing"] },
+            "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+            "expected_items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "item": { "type": "string" },
+                  "status": { "type": "string", "enum": ["done", "partial", "missed", "not_evidenced"] },
+                  "timestamp": { "type": "string" },
+                  "quote": { "type": "string" }
+                }
+              }
+            },
+            "observations": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "TM house style: '#4:30 - already assumed the child is not performing without asking the parent'"
+            }
+          }
+        }
+      },
+      "structural_metrics": {
+        "type": "object",
+        "properties": {
+          "customer_talk_share": { "type": "number" },
+          "longest_agent_monologue_turns": { "type": "integer" },
+          "agent_question_count": { "type": "integer" },
+          "comprehension_checks": { "type": "integer" },
+          "discount_position_pct": { "type": ["number", "null"] },
+          "language_match": { "type": "string", "enum": ["good", "mismatched", "not_evidenced"] },
+          "audience_calibration": { "type": "string", "enum": ["appropriate", "over_technical", "not_evidenced"] }
+        }
+      },
+      "penalties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "rule": { "type": "string" },
+            "points": { "type": "integer" },
+            "evidence": { "type": "string" }
+          }
+        }
+      },
+      "overall_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+      "top_3_fixes": {
+        "type": "array",
+        "maxItems": 3,
+        "items": {
+          "type": "object",
+          "properties": {
+            "fix": { "type": "string" },
+            "why": { "type": "string" },
+            "say_this_instead": { "type": "string" }
+          }
+        }
+      },
+      "outcome": { "type": "string", "enum": ["demo_booked_with_slot", "followup_only", "no_commitment", "call_ended_abruptly"] }
+    }
+  },
+
+  "what_to_audit_next": {
+    "priority_1_negative_class": {
+      "action": "Transcribe the 1,492 'Not Interested' calls, not just winners.",
+      "why": "All 171 transcripts are closed deals. You cannot learn what separates good from bad from success-only data — the Observer currently has no examples of failure to calibrate against. This is the single highest-value data gap."
+    },
+    "priority_2_validate_the_observer": {
+      "action": "Run the Observer over 50 known-won and 50 known-lost calls and check that won calls score higher.",
+      "why": "Until scores separate known outcomes, every downstream number (skill graph, mastery, unlocks) is opinion. This is a half-day of work and it is the difference between a demo and a product."
+    },
+    "priority_3_audit_the_one_way_defect_first": {
+      "action": "Report customer_talk_share and longest_agent_monologue for every rep, weekly.",
+      "why": "54% of winning calls contain an 8+ turn monologue and customers hold only 35% of turns. It is the most common defect, it is ASR-robust to measure, and it is highly coachable."
+    },
+    "priority_4_closing_checklist": {
+      "action": "Audit the mechanical closing items — both parents secured, slot proposed not asked, mother's number, WhatsApp reminder.",
+      "why": "Lowest-consistency phase and the most mechanical, so it improves fastest. Both-parent demos close above base rate in the funnel."
+    },
+    "priority_5_calibrate_human_vs_ai": {
+      "action": "Have a TM audit 20 calls manually, then compare against Observer output; tune the rubric where they disagree.",
+      "why": "The audit sheet shows TMs already write rich observations. The Observer should agree with them before it is trusted to scale."
+    },
+    "priority_6_sequence_violations": {
+      "action": "Track phase-order violations explicitly (need-gen before rapport, product pitch during intro, urgency before need).",
+      "why": "Three of the four manually audited calls contained a sequence violation ('#deviated from intro to need generation', '#started creating urgency without doing rapport building'). Order is part of the rubric, not a suggestion."
+    }
+  },
+
+  "detection_rates_floors": {
+    "note": "Percentage of the 171 winning calls where the behaviour was keyword-detectable on the agent side. Treat as FLOORS — Hinglish ASR loss means true rates are higher. Use for prioritisation, not for grading individuals.",
+    "greeting": 0.72,
+    "thank_close": 0.38,
+    "occupation_asked": 0.28,
+    "performance_asked": 0.22,
+    "company_named": 0.19,
+    "purpose_tied_to_test": 0.16,
+    "whatsapp_reminder": 0.16,
+    "future_plans": 0.15,
+    "self_name_stated": 0.13,
+    "counsellor_role": 0.13,
+    "competition_need_gen": 0.12,
+    "slot_suggested": 0.12,
+    "session_duration": 0.08,
+    "both_parents_secured": 0.08,
+    "school_board_asked": 0.06,
+    "alternate_or_mother_number": 0.04,
+    "three_parts_explained": 0.03,
+    "tuition_asked": 0.02,
+    "who_handles_studies": 0.01,
+    "ratio_100_5": 0.01,
+    "asked_are_you_interested": 0.0
+  },
+
+  "usage": {
+    "in_app": "Load observer_prompt as the Observer agent's system prompt and output_schema as its JSON schema (backend/src/modules/agents/observer.agent.js). Keep the existing rule that unobserved skills are omitted rather than scored.",
+    "for_tm_audits": "The output maps 1:1 onto the CRT audit sheet columns, so Observer output can be pasted into the same tracker TMs already use.",
+    "caution": "Do not grade individual reps on the keyword floors in detection_rates_floors — those are corpus-level priorities. Grade individuals on the phase rubric plus structural metrics, which are ASR-robust."
+  }
+}

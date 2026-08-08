@@ -6,6 +6,7 @@ import {
   getRepProfileWithSkills,
   updateRepProfile,
   updateQuizOutcomes,
+  ingestLmsContext,
 } from './rep-profile.service.js';
 
 const router = Router();
@@ -25,6 +26,30 @@ const quizOutcomesSchema = Joi.object().pattern(
     attempts: Joi.number().min(0),
   })
 );
+
+const lmsContextSchema = Joi.object({
+  completed: Joi.boolean(),
+  overallScore: Joi.number().min(0).max(100),
+  overallPercentage: Joi.number().min(0).max(100),
+  completionRate: Joi.number().min(0).max(100),
+  knowledgeLevel: Joi.string(),
+  productKnowledge: Joi.object().pattern(Joi.string(), Joi.number().min(0).max(100)),
+  strongAreas: Joi.array().items(Joi.string()),
+  weakAreas: Joi.array().items(Joi.string()),
+  conceptsToRevise: Joi.array().items(Joi.string()),
+  dailyPerformance: Joi.array().items(
+    Joi.object({
+      day: Joi.number(),
+      title: Joi.string(),
+      score: Joi.number().min(0).max(100),
+      status: Joi.string(),
+    }),
+  ),
+  recommendedTrainingModules: Joi.array().items(Joi.string()),
+  salesReadinessScore: Joi.number().min(0).max(100),
+  certificationStatus: Joi.string(),
+  llmSummary: Joi.string(),
+}).unknown(true);
 
 function resolveUserId(req) {
   return req.user.userId ?? req.user.id;
@@ -92,6 +117,34 @@ router.post(
       next(err);
     }
   }
+);
+
+router.post(
+  '/me/lms-context',
+  authenticate,
+  validate(lmsContextSchema),
+  async (req, res, next) => {
+    try {
+      const profile = await ingestLmsContext(resolveUserId(req), req.body);
+      res.json(profile);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:id/lms-context',
+  authenticate,
+  validate(lmsContextSchema),
+  async (req, res, next) => {
+    try {
+      const profile = await ingestLmsContext(req.params.id, req.body);
+      res.json(profile);
+    } catch (err) {
+      next(err);
+    }
+  },
 );
 
 export default router;

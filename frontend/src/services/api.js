@@ -40,6 +40,8 @@ export const repApi = {
   updateProfile: (id, data) => api.put(`/rep/${id}/profile`, data),
   updateMyQuizOutcomes: (data) => api.post('/rep/me/quiz-outcomes', data),
   updateQuizOutcomes: (id, data) => api.post(`/rep/${id}/quiz-outcomes`, data),
+  ingestMyLmsContext: (data) => api.post('/rep/me/lms-context', data),
+  ingestLmsContext: (id, data) => api.post(`/rep/${id}/lms-context`, data),
 };
 
 export const trainingApi = {

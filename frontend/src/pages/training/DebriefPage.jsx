@@ -110,6 +110,60 @@ export default function DebriefPage() {
           </div>
         </div>
 
+        {debrief.callAudit?.phases?.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900">CRT Call Audit (5 phases)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {debrief.callAudit.phases.map((phase) => (
+                <div key={phase.phase} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-slate-600 capitalize">
+                      {phase.phase?.replace(/_/g, ' ')}
+                    </span>
+                    <span className={`text-lg font-bold ${phase.score >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {phase.score}
+                    </span>
+                  </div>
+                  {phase.observations?.slice(0, 2).map((obs, i) => (
+                    <p key={i} className="text-[11px] text-slate-500 leading-snug mt-1">{obs}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+            {debrief.callAudit.structural_metrics && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100">
+                {[
+                  ['Customer talk share', debrief.callAudit.structural_metrics.customer_talk_share != null
+                    ? `${Math.round(debrief.callAudit.structural_metrics.customer_talk_share * 100)}%` : '—'],
+                  ['Longest monologue', debrief.callAudit.structural_metrics.longest_agent_monologue_turns ?? '—'],
+                  ['Rep questions', debrief.callAudit.structural_metrics.agent_question_count ?? '—'],
+                  ['Comprehension checks', debrief.callAudit.structural_metrics.comprehension_checks ?? '—'],
+                ].map(([label, value]) => (
+                  <div key={label} className="text-center p-2 rounded bg-white border border-slate-100">
+                    <p className="text-[10px] text-slate-400 uppercase">{label}</p>
+                    <p className="text-sm font-semibold text-slate-800">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {debrief.callAudit.top_3_fixes?.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-xs font-semibold text-[#24408E] mb-2">Top fixes (TM style)</p>
+                <ul className="space-y-2">
+                  {debrief.callAudit.top_3_fixes.map((fix, i) => (
+                    <li key={i} className="text-sm text-slate-600">
+                      <span className="font-medium text-slate-800">{fix.fix}</span>
+                      {fix.say_this_instead && (
+                        <span className="block text-xs text-emerald-700 mt-0.5">Say: "{fix.say_this_instead}"</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {debrief.coachFeedback && (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-[#24408E] mb-2">Coach Feedback</h3>

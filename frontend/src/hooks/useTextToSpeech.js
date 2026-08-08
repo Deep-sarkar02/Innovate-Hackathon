@@ -24,7 +24,7 @@ export function useTextToSpeech({ language = 'en', voiceGender = 'female', perso
       .catch((err) => {
         logApiError('tts/status', err);
         setProvider('browser');
-        setTtsError('Polly unavailable — using browser Indian voice fallback.');
+        setTtsError('Server TTS unavailable — using browser Indian voice fallback.');
       });
   }, [language, voiceGender, persona]);
 
@@ -61,16 +61,17 @@ export function useTextToSpeech({ language = 'en', voiceGender = 'female', perso
     [language, voiceGender, voicesReady]
   );
 
-  const speakWithPolly = useCallback(
+  const speakWithServer = useCallback(
     async (text) => {
       const response = await ttsApi.speak({ text, language, voiceGender, persona });
       const bytes = response.data;
 
       if (!bytes?.byteLength) {
-        throw new Error('Polly returned empty audio');
+        throw new Error('Server TTS returned empty audio');
       }
 
-      const blob = new Blob([bytes], { type: 'audio/mpeg' });
+      const mimeType = response.headers['content-type'] || 'audio/mpeg';
+      const blob = new Blob([bytes], { type: mimeType });
       const url = URL.createObjectURL(blob);
 
       return new Promise((resolve, reject) => {
@@ -88,7 +89,7 @@ export function useTextToSpeech({ language = 'en', voiceGender = 'female', perso
         audio.onerror = () => {
           setSpeaking(false);
           URL.revokeObjectURL(url);
-          reject(new Error('Browser failed to play Polly audio'));
+          reject(new Error('Browser failed to play server TTS audio'));
         };
 
         audio.play().catch((err) => {
@@ -106,24 +107,24 @@ export function useTextToSpeech({ language = 'en', voiceGender = 'female', perso
       const text = sanitizeForSpeech(rawText);
       if (!text) return;
 
-      if (provider === 'polly') {
+      if (provider === 'sarvam' || provider === 'polly') {
         try {
           setTtsError(null);
-          await speakWithPolly(text);
+          await speakWithServer(text);
           return;
         } catch (err) {
           logApiError('tts/speak', err);
           setTtsError(
             err.response?.data?.error
             || err.message
-            || 'Polly failed — falling back to browser voice'
+            || 'Server TTS failed — falling back to browser voice'
           );
         }
       }
 
       await speakWithBrowser(text);
     },
-    [provider, speakWithPolly, speakWithBrowser]
+    [provider, speakWithServer, speakWithBrowser]
   );
 
   const stop = useCallback(() => {

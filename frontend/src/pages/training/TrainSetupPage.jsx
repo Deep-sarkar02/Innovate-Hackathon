@@ -28,7 +28,7 @@ const DIFFICULTY_COLORS = {
   hard: 'bg-rose-100 text-rose-800 border-rose-200',
 };
 
-function ProfileCard({ profile, selected, onSelect }) {
+function ProfileCard({ profile, selected, recommended, onSelect }) {
   const diffClass = DIFFICULTY_COLORS[profile.difficulty] ?? DIFFICULTY_COLORS.moderate;
 
   return (
@@ -54,7 +54,12 @@ function ProfileCard({ profile, selected, onSelect }) {
         {profile.persona.city} · Grade {profile.persona.childGrade} · {profile.persona.board}
       </p>
       <p className="text-xs text-slate-600 line-clamp-2">{profile.summary}</p>
-      {profile.isDefault && (
+      {recommended && (
+        <span className="inline-block mt-2 text-[10px] uppercase tracking-wide text-emerald-700 font-semibold">
+          Adaptive pick for your skill level
+        </span>
+      )}
+      {profile.isDefault && !recommended && (
         <span className="inline-block mt-2 text-[10px] uppercase tracking-wide text-[#24408E] font-semibold">
           Recommended start
         </span>
@@ -80,8 +85,10 @@ export default function TrainSetupPage() {
       setPlan(planRes.data);
       const list = profilesRes.data.profiles ?? [];
       setProfiles(list);
+      const recommendedId = planRes.data.recommendedProfileId
+        ?? planRes.data.sessionBrief?.profileId;
       const defaultId = list.find((p) => p.isDefault)?.profileId ?? list[0]?.profileId;
-      setSelectedProfileId(planRes.data.sessionBrief?.profileId ?? defaultId);
+      setSelectedProfileId(recommendedId ?? defaultId);
       if (planRes.data.repProfile?.language) setLanguage(planRes.data.repProfile.language);
     }).catch((err) => logApiError('train-setup', err));
   }, []);
@@ -99,9 +106,9 @@ export default function TrainSetupPage() {
   async function startSimulation() {
     setStarting(true);
     try {
-      const { data } = await trainingApi.startSession({ language, voiceGender, profileId: selectedProfileId });
+      const { data } = await trainingApi.startSession({ language, profileId: selectedProfileId });
       navigate(`/train/${data.sessionId}`, {
-        state: { sessionData: data, language, voiceGender, openingLine: data.openingLine },
+        state: { sessionData: data, language, openingLine: data.openingLine },
       });
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to start simulation');
@@ -115,12 +122,25 @@ export default function TrainSetupPage() {
       <main className="max-w-3xl px-8 py-8 space-y-6">
         {plan?.sessionBrief && <SessionBriefCard sessionBrief={plan.sessionBrief} variant="light" />}
 
+        {plan?.adaptivePlan && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-900">
+            <p className="font-semibold mb-1">Adaptive training plan</p>
+            <p className="text-emerald-800">
+              Today&apos;s focus: <span className="font-medium capitalize">{plan.adaptivePlan.objective.replace(/_/g, ' ')}</span>
+              {plan.adaptivePlan.objectiveReason && ` — ${plan.adaptivePlan.objectiveReason}`}
+            </p>
+            {plan.adaptivePlan.lastCoachFeedback && (
+              <p className="text-emerald-700 mt-2 text-xs italic">&ldquo;{plan.adaptivePlan.lastCoachFeedback}&rdquo;</p>
+            )}
+          </div>
+        )}
+
         {profiles.length > 0 && (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Choose Customer Persona</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Indian parents from tier 1–4 cities — child in class 1–12. Each profile mirrors real funnel behaviour.
+                Profile difficulty adapts to your skill graph. Observer → Coach updates your scores after each session.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -129,6 +149,7 @@ export default function TrainSetupPage() {
                   key={p.profileId}
                   profile={p}
                   selected={selectedProfileId === p.profileId}
+                  recommended={plan?.recommendedProfileId === p.profileId}
                   onSelect={setSelectedProfileId}
                 />
               ))}
@@ -176,8 +197,8 @@ export default function TrainSetupPage() {
             <p className="text-xs text-slate-500 mt-2">
               Voice and personality stay in sync — mother profiles use a female voice, father profiles use a male voice.
               {language === 'hi'
-                ? ` Polly: ${voiceGender === 'female' ? 'Kajal · Hindi Neural' : 'Aditi · Hindi'}.`
-                : ` Polly: ${voiceGender === 'female' ? 'Raveena · Indian English' : 'Aditi · Indian English'}.`}
+                ? ` Sarvam: ${voiceGender === 'female' ? 'Kavya · Hindi' : 'Rahul · Hindi'}.`
+                : ` Sarvam: ${voiceGender === 'female' ? 'Priya · Indian English' : 'Aditya · Indian English'}.`}
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sttApi } from '../services/api.js';
 import { useTranscribeSpeech } from './useTranscribeSpeech.js';
 
@@ -91,17 +91,40 @@ function useBrowserSpeechRecognition({ onResult, enabled = true, speaker = 'sale
 
 export function useSpeechRecognition(options) {
   const [provider, setProvider] = useState(null);
+  const [useBrowserFallback, setUseBrowserFallback] = useState(false);
+  const failureCountRef = useRef(0);
 
   useEffect(() => {
     sttApi.status().then(({ data }) => setProvider(data.provider)).catch(() => setProvider('browser'));
   }, []);
 
-  const transcribe = useTranscribeSpeech({ ...options, enabled: options.enabled && provider === 'transcribe' });
-  const browser = useBrowserSpeechRecognition({ ...options, enabled: options.enabled && provider === 'browser' });
+  const handleSttFailure = useCallback(() => {
+    failureCountRef.current += 1;
+    if (failureCountRef.current >= 1) {
+      setUseBrowserFallback(true);
+    }
+  }, []);
+
+  const useServerStt = !useBrowserFallback && (provider === 'transcribe' || provider === 'sarvam');
+
+  const transcribe = useTranscribeSpeech({
+    ...options,
+    enabled: options.enabled && useServerStt,
+    provider,
+    onFailure: handleSttFailure,
+  });
+  const browser = useBrowserSpeechRecognition({
+    ...options,
+    enabled: options.enabled && (provider === 'browser' || useBrowserFallback),
+  });
 
   if (provider === null) {
     return { listening: false, supported: true, error: null, provider: null };
   }
 
-  return provider === 'transcribe' ? transcribe : browser;
+  if (useServerStt) {
+    return transcribe;
+  }
+
+  return browser;
 }

@@ -29,6 +29,9 @@ export const env = {
   demoUserPassword: process.env.DEMO_USER_PASSWORD || 'demo1234',
   seedDemoUsers: process.env.SEED_DEMO_USERS !== 'false',
   deepgramApiKey: process.env.DEEPGRAM_API_KEY || '',
+  sarvamApiKey: process.env.SARVAM_API_KEY || '',
+  kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || '',
+  kimiModel: process.env.KIMI_MODEL || 'kimi-k3',
   bedrockApiKey:
     process.env.BEDROCK_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK || '',
   awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
@@ -36,7 +39,7 @@ export const env = {
   awsSessionToken: process.env.AWS_SESSION_TOKEN || '',
   awsProfile: process.env.AWS_PROFILE || '',
   awsRegion: process.env.AWS_REGION || 'us-west-2',
-  bedrockModel: process.env.BEDROCK_MODEL || 'mistral.ministral-3-14b-instruct',
+  bedrockModel: process.env.BEDROCK_MODEL || 'mistral.mistral-large-3-675b-instruct',
 };
 
 export function isLiveKitConfigured() {
@@ -63,4 +66,14 @@ export function isPollyConfigured() {
 
 export function isTranscribeConfigured() {
   return Boolean(env.awsAccessKeyId && env.awsSecretAccessKey);
+}
+
+export function isSarvamConfigured() {
+  const key = env.sarvamApiKey;
+  return Boolean(key && key.startsWith('sk_') && !key.includes('your-sarvam'));
+}
+
+export function isKimiConfigured() {
+  const key = env.kimiApiKey;
+  return Boolean(key && key.startsWith('sk-') && !key.includes('your-kimi') && !key.includes('your-openai'));
 }

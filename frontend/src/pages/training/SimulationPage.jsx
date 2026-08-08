@@ -53,8 +53,9 @@ export default function SimulationPage() {
   });
 
   const brief = sessionBrief ?? sessionData?.sessionBrief;
-  const customerPersona = brief?.persona ?? 'father';
-  const customerVoice = brief?.voiceGender ?? location.state?.voiceGender ?? 'female';
+  const customerPersona = brief?.persona ?? brief?.personaRole ?? 'father';
+  const customerVoice = brief?.voiceGender
+    ?? (customerPersona === 'mother' ? 'female' : customerPersona === 'father' ? 'male' : 'female');
 
   const { speak, speaking: customerSpeaking, provider: ttsProvider, voiceInfo, ttsError } = useTextToSpeech({
     language,
@@ -134,7 +135,7 @@ export default function SimulationPage() {
         {aiMode === 'mock' && (
           <div className="mb-4 rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
             ⚠ SIMULATION MODE — the AI service is unavailable, so customer replies and scoring
-            are deterministic stand-ins. Check OPENAI_API_KEY / the /health endpoint.
+            are deterministic stand-ins. Check KIMI_API_KEY / BEDROCK_API_KEY and the /health endpoint.
           </div>
         )}
         {brief && (
@@ -143,24 +144,29 @@ export default function SimulationPage() {
           </div>
         )}
 
-        {liveActive && ttsProvider === 'polly' && (
+        {liveActive && (ttsProvider === 'sarvam' || ttsProvider === 'polly') && (
           <div className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
-            🔊 Customer voice: {voiceInfo?.label ?? 'Amazon Polly · Indian accent'}
+            🔊 Customer voice: {voiceInfo?.label ?? (ttsProvider === 'sarvam' ? 'Sarvam · Indian accent' : 'Amazon Polly · Indian accent')}
           </div>
         )}
         {liveActive && ttsProvider === 'browser' && (
           <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
-            🔊 Using browser voice — Polly not connected. Check AWS IAM credentials and refresh the page.
+            🔊 Using browser voice — set SARVAM_API_KEY or AWS Polly credentials and refresh the page.
           </div>
         )}
         {liveActive && ttsError && (
           <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300">
-            Polly error: {ttsError}
+            TTS error: {ttsError}
           </div>
         )}
-        {liveActive && sttProvider === 'transcribe' && (
+        {liveActive && (sttProvider === 'sarvam' || sttProvider === 'transcribe') && (
           <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
-            🎙 Voice input via Amazon Transcribe — speak naturally, pauses are detected automatically.
+            🎙 Voice input via {sttProvider === 'sarvam' ? 'Sarvam AI' : 'Amazon Transcribe'} — speak naturally, pauses are detected automatically. Keep each turn under 28 seconds.
+          </div>
+        )}
+        {liveActive && sttProvider === 'browser' && supported && (
+          <div className="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-300">
+            🎙 Using browser speech recognition — server STT unavailable or fell back automatically.
           </div>
         )}
         {liveActive && (!supported || speechError) && (

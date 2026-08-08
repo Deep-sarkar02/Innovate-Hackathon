@@ -43,6 +43,8 @@ const sessionBriefSchema = new mongoose.Schema(
     region: { type: String },
     objections: { type: [mongoose.Schema.Types.Mixed], default: undefined },
     yieldConditions: { type: [String], default: undefined },
+    voiceGender: { type: String, enum: ['female', 'male'] },
+    personaRole: { type: String },
     stateSeed: { type: mongoose.Schema.Types.Mixed, default: undefined },
   },
   { _id: false, strict: false }

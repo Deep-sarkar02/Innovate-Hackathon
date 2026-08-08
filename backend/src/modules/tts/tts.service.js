@@ -1,8 +1,10 @@
 import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
-import { env, isPollyConfigured } from '../../config/env.js';
+import { env, isPollyConfigured, isSarvamConfigured } from '../../config/env.js';
 import { sanitizeForSpeech } from '../../utils/speechText.js';
 import { listPollyVoices, resolvePollyVoice } from './polly.voices.js';
 import { textToSsml } from './ssml.js';
+import { synthesizeSarvamSpeech } from '../sarvam/sarvam.tts.js';
+import { listSarvamVoices, resolveSarvamVoice } from '../sarvam/sarvam.voices.js';
 
 let client;
 if (isPollyConfigured()) {
@@ -17,14 +19,22 @@ if (isPollyConfigured()) {
 }
 
 export function getTtsProvider() {
-  return isPollyConfigured() ? 'polly' : 'browser';
+  if (isSarvamConfigured()) return 'sarvam';
+  if (isPollyConfigured()) return 'polly';
+  return 'browser';
 }
 
 export function getTtsVoiceCatalog() {
+  if (isSarvamConfigured()) return listSarvamVoices();
   return listPollyVoices();
 }
 
-export async function synthesizeSpeech(text, { language = 'en', voiceGender = 'female', persona = 'father' } = {}) {
+export function resolveTtsVoice(language = 'en', voiceGender = 'female', persona = null) {
+  if (isSarvamConfigured()) return resolveSarvamVoice(language, voiceGender, persona);
+  return resolvePollyVoice(language, voiceGender, persona);
+}
+
+async function synthesizePollySpeech(text, { language = 'en', voiceGender = 'female', persona = 'father' } = {}) {
   const spoken = sanitizeForSpeech(text);
   if (!client || !spoken) return null;
 
@@ -47,19 +57,36 @@ export async function synthesizeSpeech(text, { language = 'en', voiceGender = 'f
     const stream = response.AudioStream;
     if (!stream) return null;
 
+    let audio;
     if (typeof stream.transformToByteArray === 'function') {
-      return Buffer.from(await stream.transformToByteArray());
+      audio = Buffer.from(await stream.transformToByteArray());
+    } else {
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      audio = Buffer.concat(chunks);
     }
 
-    const chunks = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
+    return { audio, contentType: 'audio/mpeg', voice };
   } catch (err) {
     console.warn('[polly] TTS failed:', err.message, voice);
     return null;
   }
 }
 
-export { isPollyConfigured };
+export async function synthesizeSpeech(text, options = {}) {
+  if (isSarvamConfigured()) {
+    const sarvam = await synthesizeSarvamSpeech(text, options);
+    if (sarvam) return sarvam;
+  }
+
+  if (isPollyConfigured()) {
+    const polly = await synthesizePollySpeech(text, options);
+    if (polly) return polly;
+  }
+
+  return null;
+}
+
+export { isPollyConfigured, isSarvamConfigured };

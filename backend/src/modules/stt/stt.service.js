@@ -2,15 +2,16 @@ import {
   TranscribeStreamingClient,
   StartStreamTranscriptionCommand,
 } from '@aws-sdk/client-transcribe-streaming';
-import { env, isTranscribeConfigured } from '../../config/env.js';
+import { env, isTranscribeConfigured, isSarvamConfigured } from '../../config/env.js';
+import { transcribeSarvamPcm } from '../sarvam/sarvam.stt.js';
 
 const LANGUAGE_CODES = {
   en: 'en-IN',
   hi: 'hi-IN',
 };
 
-const CHUNK_SIZE = 3200; // ~100ms of 16 kHz 16-bit mono PCM
-const MIN_PCM_BYTES = 6400; // ~200ms minimum utterance
+const CHUNK_SIZE = 3200;
+const MIN_PCM_BYTES = 6400;
 
 let client;
 if (isTranscribeConfigured()) {
@@ -25,7 +26,9 @@ if (isTranscribeConfigured()) {
 }
 
 export function getSttProvider() {
-  return isTranscribeConfigured() ? 'transcribe' : 'browser';
+  if (isSarvamConfigured()) return 'sarvam';
+  if (isTranscribeConfigured()) return 'transcribe';
+  return 'browser';
 }
 
 function* pcmChunks(pcmBuffer) {
@@ -34,7 +37,7 @@ function* pcmChunks(pcmBuffer) {
   }
 }
 
-export async function transcribePcm(pcmBuffer, { language = 'en', sampleRate = 16000 } = {}) {
+async function transcribeAwsPcm(pcmBuffer, { language = 'en', sampleRate = 16000 } = {}) {
   if (!client || !pcmBuffer?.length) return null;
   if (pcmBuffer.length < MIN_PCM_BYTES) return null;
 
@@ -68,4 +71,18 @@ export async function transcribePcm(pcmBuffer, { language = 'en', sampleRate = 1
   }
 }
 
-export { isTranscribeConfigured };
+export async function transcribePcm(pcmBuffer, options = {}) {
+  if (isSarvamConfigured()) {
+    const sarvam = await transcribeSarvamPcm(pcmBuffer, options);
+    if (sarvam) return sarvam;
+  }
+
+  if (isTranscribeConfigured()) {
+    const aws = await transcribeAwsPcm(pcmBuffer, options);
+    if (aws) return aws;
+  }
+
+  return null;
+}
+
+export { isTranscribeConfigured, isSarvamConfigured };

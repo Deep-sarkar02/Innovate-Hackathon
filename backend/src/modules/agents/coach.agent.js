@@ -81,19 +81,27 @@ export async function coachSession({
     const aiFeedback = await callLLM([
       {
         role: 'system',
-        content: `You are a Coach Agent. Provide brief, actionable feedback (2-3 sentences) for a sales rep after a training session. Never generate customer dialogue.`,
+        content: `You are the Coach Agent for Infinity Learn sales training. After the Observer AI audits a call, you translate findings into 2-3 sentences of actionable feedback for the rep. Reference specific mistakes and top fixes from the CRT audit. Never role-play as the customer.`,
       },
       {
         role: 'user',
         content: JSON.stringify({
           objective: sessionBrief.objective,
+          lmsContext: sessionBrief.lmsHints ?? null,
           mistakes: observerOutput.mistakes,
           highlights: observerOutput.highlights,
-          skillDeltas: appliedDeltas.filter((d) => d.skillId === sessionBrief.objective),
-          recommendations: lmsRecommendations,
+          topFixes: observerOutput.callAudit?.top_3_fixes,
+          crtPhases: observerOutput.callAudit?.phases?.map((p) => ({
+            phase: p.phase,
+            score: p.score,
+            observation: p.observations?.[0],
+          })),
+          structuralMetrics: observerOutput.callAudit?.structural_metrics,
+          skillDeltas: appliedDeltas,
+          lmsRecommendations,
         }),
       },
-    ]);
+    ], false, { reasoning_effort: 'high', max_tokens: 400 });
     if (aiFeedback) coachFeedback = aiFeedback.trim();
   }
 
@@ -115,6 +123,7 @@ export async function coachSession({
     confidence: observerOutput.confidence ?? 50,
     evaluationMode: observerOutput.mode ?? 'mock',
     evidenceQuotes: observerOutput.evidenceQuotes ?? {},
+    callAudit: observerOutput.callAudit ?? null,
     durationMinutes,
     // null when the objective skill was never exercised — do not fake a 50
     ...(observerOutput.overallScore != null ? { overallScore: observerOutput.overallScore } : {}),

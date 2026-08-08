@@ -18,6 +18,16 @@ router.get('/status', (_req, res) => {
 router.post('/transcribe', validate(transcribeSchema), async (req, res, next) => {
   try {
     const pcmBuffer = Buffer.from(req.body.audio, 'base64');
+    const durationSec = pcmBuffer.length / (req.body.sampleRate * 2);
+
+    if (durationSec > 30) {
+      return res.status(413).json({
+        error: 'Utterance too long for server STT (max 28s). Pause briefly between sentences.',
+        provider: getSttProvider(),
+        code: 'audio_too_long',
+      });
+    }
+
     const text = await transcribePcm(pcmBuffer, {
       language: req.body.language,
       sampleRate: req.body.sampleRate,
@@ -25,12 +35,13 @@ router.post('/transcribe', validate(transcribeSchema), async (req, res, next) =>
 
     if (!text) {
       return res.status(503).json({
-        error: 'STT unavailable or no speech detected. Configure AWS IAM credentials for Amazon Transcribe, or use browser speech.',
+        error: 'No speech detected or STT temporarily unavailable. Try speaking again or type your message.',
         provider: getSttProvider(),
+        code: 'stt_unavailable',
       });
     }
 
-    res.json({ text, provider: 'transcribe' });
+    res.json({ text, provider: getSttProvider() });
   } catch (err) {
     next(err);
   }

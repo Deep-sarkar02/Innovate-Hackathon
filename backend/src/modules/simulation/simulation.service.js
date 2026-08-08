@@ -5,6 +5,7 @@ import { generateSessionBrief } from '../training-planner/planner.service.js';
 import { initialStateFromProfile } from '../customer-profiles/customer-profiles.service.js';
 import { COLD_CALL_OPENING } from '../customer-profiles/customer-instructor.js';
 import { generateCustomerReply, updateCustomerState, applyCustomerReplyStateEffects, computeStateDeltas, snapshotCustomerState, advanceConversationState } from '../agents/customer.agent.js';
+import { resolvePersonaRole } from '../customer-profiles/customer-instructor.js';
 import { resolveVoiceGender } from '../customer-profiles/customer-profiles.service.js';
 import { observeSession } from '../agents/observer.agent.js';
 import { coachSession } from '../agents/coach.agent.js';
@@ -13,6 +14,37 @@ import { env, isLiveKitConfigured } from '../../config/env.js';
 import { AccessToken } from 'livekit-server-sdk';
 
 const TRANSCRIPT_TTL_HOURS = 24;
+const sessionTurnLocks = new Map();
+
+async function withSessionTurnLock(sessionId, fn) {
+  while (sessionTurnLocks.get(sessionId)) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  sessionTurnLocks.set(sessionId, true);
+  try {
+    return await fn();
+  } finally {
+    sessionTurnLocks.delete(sessionId);
+  }
+}
+
+async function saveSessionWithRetry(session, maxAttempts = 3) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      await session.save();
+      return;
+    } catch (err) {
+      const isVersionConflict = err.name === 'VersionError'
+        || /No matching document found for id/.test(err.message ?? '');
+      if (!isVersionConflict || attempt === maxAttempts - 1) throw err;
+      const fresh = await TrainingSession.findById(session._id);
+      if (!fresh) throw err;
+      session.transcript = fresh.transcript;
+      session.customerState = fresh.customerState;
+      session.__v = fresh.__v;
+    }
+  }
+}
 
 function initialCustomerState(sessionBrief) {
   if (sessionBrief.stateSeed || sessionBrief.profileId) {
@@ -55,7 +87,13 @@ export async function startTrainingSession(repId, options = {}) {
   }));
   const language = options.language ?? sessionBrief.language ?? 'en';
   sessionBrief.language = language;
-  const voiceGender = sessionBrief.voiceGender ?? resolveVoiceGender(sessionBrief) ?? options.voiceGender ?? 'female';
+
+  // Persona + voice always follow the selected profile — frontend cannot desync them.
+  sessionBrief.persona = resolvePersonaRole(sessionBrief);
+  sessionBrief.personaRole = sessionBrief.persona;
+  const voiceGender = resolveVoiceGender(sessionBrief);
+  sessionBrief.voiceGender = voiceGender;
+
   const roomId = `train-${uuidv4().slice(0, 8)}`;
 
   const expires = new Date();
@@ -98,60 +136,62 @@ export async function startTrainingSession(repId, options = {}) {
 }
 
 export async function appendTrainingTurn(sessionId, { speaker, text }) {
-  const session = await TrainingSession.findById(sessionId);
-  if (!session) {
-    const err = new Error('Training session not found');
-    err.statusCode = 404;
-    throw err;
-  }
-
-  session.transcript.push({ speaker, text, timestamp: new Date() });
-
-  let customerReply = null;
-  let aiMode = null;
-  if (speaker === 'sales_executive') {
-    const before = snapshotCustomerState(session.customerState);
-
-    session.customerState = updateCustomerState(session.customerState, text, session.sessionBrief);
-    session.markModified('customerState');
-
-    const reply = await generateCustomerReply(session, text);
-    if (reply?.text) {
-      aiMode = reply.mode;
-      customerReply = { speaker: 'customer', text: reply.text, timestamp: new Date() };
-      session.transcript.push(customerReply);
-      session.customerState = applyCustomerReplyStateEffects(session.customerState, reply.text);
-      session.customerState = advanceConversationState(
-        session.customerState,
-        text,
-        session.sessionBrief,
-        reply.text,
-      );
-      session.markModified('customerState');
+  return withSessionTurnLock(String(sessionId), async () => {
+    const session = await TrainingSession.findById(sessionId);
+    if (!session) {
+      const err = new Error('Training session not found');
+      err.statusCode = 404;
+      throw err;
     }
 
-    const stateDeltas = computeStateDeltas(before, session.customerState);
+    session.transcript.push({ speaker, text, timestamp: new Date() });
 
-    await session.save();
+    let customerReply = null;
+    let aiMode = null;
+    if (speaker === 'sales_executive') {
+      const before = snapshotCustomerState(session.customerState);
+
+      session.customerState = updateCustomerState(session.customerState, text, session.sessionBrief);
+      session.markModified('customerState');
+
+      const reply = await generateCustomerReply(session, text);
+      if (reply?.text) {
+        aiMode = reply.mode;
+        customerReply = { speaker: 'customer', text: reply.text, timestamp: new Date() };
+        session.transcript.push(customerReply);
+        session.customerState = applyCustomerReplyStateEffects(session.customerState, reply.text);
+        session.customerState = advanceConversationState(
+          session.customerState,
+          text,
+          session.sessionBrief,
+          reply.text,
+        );
+        session.markModified('customerState');
+      }
+
+      const stateDeltas = computeStateDeltas(before, session.customerState);
+
+      await saveSessionWithRetry(session);
+
+      return {
+        transcript: session.transcript,
+        customerReply,
+        customerState: session.toObject().customerState,
+        stateDeltas,
+        aiMode,
+      };
+    }
+
+    await saveSessionWithRetry(session);
 
     return {
       transcript: session.transcript,
       customerReply,
       customerState: session.toObject().customerState,
-      stateDeltas,
+      stateDeltas: {},
       aiMode,
     };
-  }
-
-  await session.save();
-
-  return {
-    transcript: session.transcript,
-    customerReply,
-    customerState: session.toObject().customerState,
-    stateDeltas: {},
-    aiMode,
-  };
+  });
 }
 
 export async function getTrainingSession(sessionId) {
@@ -180,7 +220,9 @@ export async function endTrainingSession(sessionId) {
     ? Math.round((session.endTime - session.startTime) / 60000)
     : 0;
 
-  const observerOutput = await observeSession(session.sessionBrief, session.transcript);
+  const observerOutput = await observeSession(session.sessionBrief, session.transcript, {
+    durationMinutes,
+  });
   const currentGraph = await getSkillGraphForUser(session.repId);
 
   const coachResult = await coachSession({

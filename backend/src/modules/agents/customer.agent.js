@@ -2,7 +2,7 @@ import { callLLM, isLlmConfigured } from './llm.client.js';
 import { getCustomerKnowledgeForBrief } from '../cohort-kb/cohort-kb.service.js';
 import { sanitizeForSpeech } from '../../utils/speechText.js';
 import { OBJECTIONS } from '../../seed/cohorts.seed.js';
-import { buildInstructorPrompt } from '../customer-profiles/customer-instructor.js';
+import { buildInstructorPrompt, resolvePersonaRole } from '../customer-profiles/customer-instructor.js';
 /**
  * Customer Agent — talks. Never evaluates, never coaches.
  *
@@ -40,10 +40,19 @@ function buildCustomerSystemPrompt(sessionBrief, knowledge, customerState, langu
     .map((n) => `- ${n.content}`)
     .join('\n');
 
+  const lmsBlock = sessionBrief.lmsHints
+    ? `
+CRT TRAINING GAPS (parent may probe these topics — stay realistic, do not teach):
+- Weak areas: ${(sessionBrief.lmsHints.weakAreas ?? []).join(', ') || 'none listed'}
+- Concepts rep should know: ${(sessionBrief.lmsHints.conceptsToRevise ?? []).join(', ') || 'none listed'}
+If the rep fumbles JEE/NEET eligibility or exam facts, push back skeptically as a parent would.`
+    : '';
+
   return `${instructorBlock}
 
 ADDITIONAL CONTEXT FROM KNOWLEDGE BASE:
 ${backgroundBlock || '- Your child took a school test via Infinity Learn.'}
+${lmsBlock}
 
 PRIMARY OBJECTION THIS SESSION: ${objection.label} — "${objection.customerLine}"
 
@@ -360,6 +369,8 @@ export async function generateCustomerReply(session, repMessage) {
     .map((o) => o.sample_line)
     .slice(0, 2);
 
+  const personaRole = resolvePersonaRole(sessionBrief);
+
   const userPrompt = `Conversation so far:
 ${history || '(session just started)'}
 
@@ -369,9 +380,10 @@ YOUR PREVIOUS LINES (do NOT repeat these questions or phrases):
 ${previousCustomerLines.length ? previousCustomerLines.map((l) => `- "${l}"`).join('\n') : '(opening only)'}
 
 Stage: ${phase} | Turn: ${(customerState.turnCount ?? 0) + 1}
+Persona: ${personaRole} (${sessionBrief.customerName ?? 'customer'})
 ${objectionsLeft.length ? `Next objection you may raise (only if rep hasn't addressed it): "${objectionsLeft[0]}"` : 'Rep is doing well — soften and move toward demo timing.'}
 
-Respond as ${sessionBrief.customerName ?? 'the customer'} (${sessionBrief.persona}). Acknowledge what the rep said, then move FORWARD. 1–3 sentences only.`;
+Respond as ${sessionBrief.customerName} — the ${personaRole}. MAX two short sentences, ONE question. Stay in ${personaRole} gender/identity. Move FORWARD.`;
 
   if (isLlmConfigured()) {
     const reply = await callLLM([

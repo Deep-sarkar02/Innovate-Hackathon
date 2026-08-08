@@ -44,6 +44,7 @@ const sessionInsightSchema = new mongoose.Schema(
     evaluationMode: { type: String, enum: ['llm', 'mock'], default: 'mock' },
     // Verbatim transcript quotes backing each score (LLM mode only)
     evidenceQuotes: { type: Map, of: String },
+    callAudit: { type: mongoose.Schema.Types.Mixed },
   },
   { timestamps: true }
 );

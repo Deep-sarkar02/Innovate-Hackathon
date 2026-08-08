@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COLD_CALL_OPENING } from './customer-instructor.js';
+import { COLD_CALL_OPENING, resolvePersonaRole } from './customer-instructor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const profilesData = JSON.parse(
@@ -13,14 +13,16 @@ const SHARED = profilesData.shared ?? {};
 const TRAINING_LADDER = profilesData.training_ladder?.sequence ?? [];
 
 export function resolveVoiceGender(profileOrBrief) {
-  const role = profileOrBrief?.persona?.role ?? profileOrBrief?.persona ?? 'father';
-  const childGender = profileOrBrief?.persona?.child_gender ?? profileOrBrief?.childGender;
+  const role = resolvePersonaRole(profileOrBrief);
+  const childGender = profileOrBrief?.childGender ?? profileOrBrief?.persona?.child_gender;
 
   if (role === 'mother') return 'female';
   if (role === 'father') return 'male';
   if (role === 'student') return childGender === 'female' ? 'female' : 'male';
   return 'female';
 }
+
+export { resolvePersonaRole };
 
 export function listCustomerProfiles() {
   return PROFILES.map((p) => ({
@@ -56,6 +58,26 @@ export function getDefaultProfile() {
   return PROFILES.find((p) => p.is_default) ?? PROFILES[0] ?? null;
 }
 
+/**
+ * Pick customer profile from the empirical training ladder based on rep skill level.
+ * Reps start on easier profiles and advance as their grounded skill average improves.
+ */
+export function pickProfileForRep(avgSkillScore) {
+  if (!TRAINING_LADDER.length) return getDefaultProfile();
+
+  let stepIndex = 0;
+  if (avgSkillScore != null) {
+    if (avgSkillScore >= 75) stepIndex = Math.min(5, TRAINING_LADDER.length - 1);
+    else if (avgSkillScore >= 65) stepIndex = Math.min(4, TRAINING_LADDER.length - 1);
+    else if (avgSkillScore >= 55) stepIndex = Math.min(3, TRAINING_LADDER.length - 1);
+    else if (avgSkillScore >= 45) stepIndex = Math.min(2, TRAINING_LADDER.length - 1);
+    else if (avgSkillScore >= 35) stepIndex = Math.min(1, TRAINING_LADDER.length - 1);
+  }
+
+  const entry = TRAINING_LADDER[stepIndex];
+  return getCustomerProfile(entry?.profile_id) ?? getDefaultProfile();
+}
+
 export function getSharedConfig() {
   return {
     objectionTaxonomy: SHARED.objection_taxonomy,
@@ -80,11 +102,12 @@ function mapDifficultyProfile(dp = {}) {
 /**
  * Build a session brief from a chosen customer profile + planner objective.
  */
-export function buildSessionBriefFromProfile(profile, { objective, goal, language = 'en' } = {}) {
+export function buildSessionBriefFromProfile(profile, { objective, goal, language = 'en', lmsHints } = {}) {
   if (!profile) throw new Error('Customer profile not found');
 
   const p = profile.persona;
   const primaryObjection = profile.objections?.[0]?.id ?? 'need_time';
+  const personaRole = p.role;
 
   return {
     profileId: profile.profile_id,
@@ -92,7 +115,8 @@ export function buildSessionBriefFromProfile(profile, { objective, goal, languag
     objective: objective ?? 'demo_pitch',
     difficulty: mapDifficultyProfile(profile.difficulty_profile),
     difficultyLabel: profile.difficulty,
-    persona: p.role,
+    persona: personaRole,
+    personaRole,
     mood: profile.difficulty === 'easy' ? 'interested' : profile.difficulty === 'hard' ? 'skeptical' : 'neutral',
     primaryObjection,
     goal: goal ?? profile.summary,
@@ -120,6 +144,7 @@ export function buildSessionBriefFromProfile(profile, { objective, goal, languag
     occupation: p.occupation,
     personaLanguage: p.language,
     stateSeed: profile.state_variables ?? {},
+    lmsHints,
   };
 }
 

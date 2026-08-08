@@ -24,7 +24,9 @@ function AudioPublisher({ onConnected, onDisconnected }) {
   useEffect(() => {
     if (connectionState === ConnectionState.Connected && !connectedRef.current) {
       connectedRef.current = true;
-      localParticipant.setMicrophoneEnabled(true);
+      localParticipant.setMicrophoneEnabled(true).catch((err) => {
+        console.warn('[livekit] Microphone unavailable:', err?.message ?? err);
+      });
       onConnectedRef.current?.();
     }
     if (connectionState === ConnectionState.Disconnected && connectedRef.current) {
@@ -80,7 +82,9 @@ export function useLiveKitMute() {
   const isMuted = !localParticipant.isMicrophoneEnabled;
 
   function toggleMute() {
-    localParticipant.setMicrophoneEnabled(isMuted);
+    localParticipant.setMicrophoneEnabled(isMuted).catch((err) => {
+      console.warn('[livekit] Microphone toggle failed:', err?.message ?? err);
+    });
   }
 
   return { isMuted, toggleMute };
