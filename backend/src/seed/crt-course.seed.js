@@ -13,6 +13,8 @@
 
 const D = (page, title, ...bullets) => ({ page, title, bullets });
 const Q = (q, options, answer) => ({ q, options, answer });
+// n rendered pages of a real PPT/PDF, streamed via the gated slide endpoint
+const IMG = (n) => Array.from({ length: n }, (_, i) => ({ page: i + 1, image: true }));
 
 export const CRT_COURSE = {
   courseId: 'crt',
@@ -56,24 +58,54 @@ export const CRT_COURSE = {
         {
           itemId: 'd1-company',
           type: 'deck',
-          title: 'Company, Roles & Growth Ladder',
+          title: 'Company Introduction (Corporate Deck)',
           durationMinutes: 30,
           deck: {
-            sourceLink: 'SharePoint: Company Profile PPT + Roles & Responsibilities PPT',
-            slides: [
-              D(1, 'Company profile', 'Mission: to be the trusted learning partner for every student', 'Core values: student outcomes first, integrity in counselling', 'Achievements: results in JEE/NEET/Olympiads via Sri Chaitanya ecosystem'),
-              D(2, 'Hierarchy you work in', 'AC → Team Manager → ASM/SM (L2) → AGM/GM (L3)', 'Your Team Manager audits calls and coaches you weekly', 'Sales enablement runs training; CS runs post-sales'),
-              D(3, 'Targets: inputs and outputs', 'Inputs: dials, connects, talk time, demos booked', 'Outputs: demos conducted, enrollments, revenue', 'Inputs are in your control daily — outputs follow inputs'),
-              D(4, 'Incentive policy', 'Incentives are output-based: enrollments and collected revenue', 'Slabs grow non-linearly — consistency beats spikes', 'Ask your TM for the current month\'s incentive sheet'),
-              D(5, 'Growth ladder', 'CRT → OJT (on-job training) → M1 and beyond', 'Promotion is performance + process: audits count, not just numbers', 'Top ACs move to senior counselling / team lead tracks'),
-              D(6, 'Website & app: your 5 star USPs', 'Know infinitylearn.com and the student portal cold', 'Pick your 5 strongest USPs and be able to demo each in 30 seconds', 'The portal IS the product during a demo — never pitch it blind'),
-            ],
+            sourceLink: 'Corporate_Deck.pdf — embedded, view-only',
+            slides: IMG(41),
             checkpoints: [
               {
-                afterPage: 3,
+                afterPage: 14,
                 questions: [
-                  Q('Which of these is an INPUT metric?', ['Revenue', 'Enrollments', 'Demos booked', 'Incentive earned'], 2),
-                  Q('What comes after CRT in your journey?', ['M1', 'OJT — on-job training', 'Team Manager', 'Direct promotion'], 1),
+                  Q('Infinity Learn is built on the 41-year legacy of…', ['Aakash', 'Sri Chaitanya', 'Allen', 'FIITJEE'], 1),
+                  Q('Who is the brand ambassador of Infinity Learn?', ['Virat Kohli', 'Grand Master Gukesh D, World Chess Champion', 'A. R. Rahman', 'P. V. Sindhu'], 1),
+                  Q('The only educational group to achieve AIR 1 in…', ['JEE Main only', 'NEET only', 'All three competitive exams', 'CUET'], 2),
+                ],
+              },
+              {
+                afterPage: 28,
+                questions: [
+                  Q('Infinity Learn\'s AI tool for learner progress is called…', ['ASTRA', 'VISTA', 'NOVA', 'PRISM'], 1),
+                  Q('The functional model covers which grades?', ['1-5', '6-13', '9-12', '11-13 only'], 1),
+                  Q('Revenue trajectory reached what figure by FY 23-24?', ['2.5 Crore', '100 Crore', '200 Crore', '500 Crore'], 2),
+                ],
+              },
+            ],
+          },
+        },
+        {
+          itemId: 'd1-roles',
+          type: 'deck',
+          title: 'Roles & Responsibilities (Expectations in CRT)',
+          durationMinutes: 20,
+          deck: {
+            sourceLink: 'Expectations in CRT.pptx — embedded, view-only',
+            slides: IMG(8),
+            checkpoints: [
+              {
+                afterPage: 4,
+                questions: [
+                  Q('The Call Mock happens between the trainee and…', ['Another trainee', 'The training manager', 'A real customer', 'HR'], 1),
+                  Q('Minimum dialed calls expected daily in OJT?', ['50', '100', '200', '500'], 2),
+                  Q('Minimum talk time expected in OJT?', ['1 hour', '1.5 hours', '2.5 hours', '4 hours'], 2),
+                ],
+              },
+              {
+                afterPage: 8,
+                questions: [
+                  Q('M1 (Month 1) sales target is…', ['₹60,000', '₹1.20 Lakh', '₹2.40 Lakh', '₹5 Lakh'], 1),
+                  Q('The associate incentive cycle is…', ['Weekly', 'Bi-weekly (15 days)', 'Monthly', 'Quarterly'], 1),
+                  Q('Incentive payout is based on…', ['Revenue punched', 'Monthly collection', 'Dial count', 'Attendance'], 1),
                 ],
               },
             ],
@@ -82,27 +114,41 @@ export const CRT_COURSE = {
         {
           itemId: 'd1-exams',
           type: 'deck',
-          title: 'Target Exams: Foundation, Olympiad, JEE, NEET',
-          durationMinutes: 40,
+          title: 'Target Exams: Foundation, NEET, JEE & CUET',
+          durationMinutes: 75,
           deck: {
-            sourceLink: 'SharePoint: Target Exams PPT (Foundation/Olympiad + JEE + NEET)',
-            slides: [
-              D(1, 'Know your funnel', '86% of the leads you will call are parents of grades 1-8', 'Foundation & Aptitude tests dominate; JEE/NEET is ~12% of calls', 'Speak the exam language of the grade you are calling'),
-              D(2, 'Foundation & Olympiad pattern', 'School-plus curriculum: NCERT base + higher-order thinking', 'Olympiads (incl. IL\'s own tests) give the child a national benchmark', 'Purpose in the call: the test report is your conversation anchor'),
-              D(3, 'Foundation syllabus story', 'Grades 1-5: concept clarity + aptitude habits', 'Grades 6-8: NCERT depth + Olympiad exposure + exam temperament', 'Compounding argument: gaps in grade 6 become walls in grade 10'),
-              D(4, 'JEE pattern', 'JEE Main: 2 attempts/year, NTA, 300 marks, Physics/Chemistry/Maths', 'JEE Advanced: top ~2.5 lakh Main qualifiers, IIT entry', 'IL/SC results: quote real selections — ask enablement for this year\'s sheet'),
-              D(5, 'JEE syllabus & prep arc', 'Class 11-12 syllabus, but foundation starts grade 8-10', 'Weekly tests + analysis > marathon lectures', 'Board-year (9-12) parents are the most EMI-dependent segment: 85% finance'),
-              D(6, 'NEET pattern', 'NEET UG: single national medical entrance, 720 marks, Bio/Phy/Chem', 'NCERT-heavy — discipline and revision cycles decide ranks', 'IL/SC results: memorise 2-3 real success stories with numbers'),
-              D(7, 'NEET syllabus & prep arc', 'Biology = 50% of marks: NCERT line-by-line mastery', 'Grade 9-10 foundation feeds directly into NEET success', 'Dropper batches exist at SC — but your funnel is parents, grades 1-10'),
-              D(8, 'Exam → pitch mapping', 'Grade 1-5 parent: foundation compounding, no exam deadline — build urgency from the child\'s trajectory', 'Grade 6-8: Olympiad benchmark + foundation gap', 'Grade 9-12: board + JEE/NEET calendar urgency is real — use it honestly'),
-            ],
+            sourceLink: 'Target Exams.pdf — embedded, view-only (one deck, three sessions)',
+            slides: IMG(71),
             checkpoints: [
               {
-                afterPage: 4,
+                afterPage: 15,
                 questions: [
-                  Q('What share of your real calls are parents of grades 1-8?', ['~25%', '~50%', '~86%', '~99%'], 2),
-                  Q('JEE Main allows how many attempts per year?', ['1', '2', '3', 'Unlimited'], 1),
-                  Q('What anchors a winning first call?', ['Discount offer', 'The child\'s own test report', 'Competitor comparison', 'Company history'], 1),
+                  Q('NTSE is conducted by…', ['SOF', 'NCERT', 'NTA', 'Unified Council'], 1),
+                  Q('NSO and IMO are conducted by…', ['NCERT', 'Science Olympiad Foundation (SOF)', 'NTA', 'CBSE'], 1),
+                  Q('NSTSE is conducted by…', ['Unified Council', 'SOF', 'NCERT', 'AIIMS'], 0),
+                ],
+              },
+              {
+                afterPage: 31,
+                questions: [
+                  Q('Total marks in NEET?', ['300', '360', '720', '800'], 2),
+                  Q('NEET marking per question is…', ['+4 correct, -1 wrong', '+1 correct, 0 wrong', '+4 correct, 0 wrong', '+2 correct, -0.5 wrong'], 0),
+                  Q('NEET question paper is provided in how many languages?', ['10', '13', '15', '29'], 1),
+                ],
+              },
+              {
+                afterPage: 53,
+                questions: [
+                  Q('JEE Main total questions to be answered?', ['60', '75', '90', '100'], 1),
+                  Q('JEE Advanced eligibility: top how many JEE Main qualifiers?', ['50,000', '1,00,000', '2,50,000', '5,00,000'], 2),
+                  Q('Total seats across the 23 IITs (per the deck)?', ['~10,000', '~14,000', '~18,160', '~25,000'], 2),
+                ],
+              },
+              {
+                afterPage: 69,
+                questions: [
+                  Q('CUET is the entrance for…', ['IITs', 'Medical colleges', 'UG programs in Central Universities', 'Polytechnics'], 2),
+                  Q('CUET is conducted as a…', ['Pen & paper test', 'Computer-based test (CBT)', 'Interview', 'Portfolio review'], 1),
                 ],
               },
             ],
@@ -111,17 +157,33 @@ export const CRT_COURSE = {
         {
           itemId: 'd1-final',
           type: 'quiz',
-          title: 'Day 1 Final Quiz',
-          durationMinutes: 15,
+          title: 'Day 1 Final Quiz — Target Exams (official)',
+          durationMinutes: 20,
           quiz: {
             passPct: 70,
+            // The actual CRT Day-1 Google Form quiz, minus email/employee fields.
+            // Answers verified against the Target Exams deck itself.
             questions: [
-              Q('Why does IL diagnose before pitching?', ['It is legally required', 'The child\'s test report makes the conversation about THEIR gap, not our product', 'It delays the call', 'Parents demand it'], 1),
-              Q('Which demo length closes at 21.5% in real data?', ['Under 30 min', '30-60 min', '60-90 min', '90+ minutes'], 3),
-              Q('Inputs vs outputs: which pair is right?', ['Dials=output, revenue=input', 'Dials=input, enrollments=output', 'Both are outputs', 'Both are inputs'], 1),
-              Q('NEET marks split — which subject is half the paper?', ['Physics', 'Chemistry', 'Biology', 'Maths'], 2),
-              Q('A grade 3 parent has no exam deadline. Where does urgency come from?', ['Fake limited offers', 'The child\'s learning-gap compounding over grades', 'Threatening failure', 'There is no urgency'], 1),
-              Q('What % of real closed deals are financed (EMI)?', ['~25%', '~50%', '~75%', '~95%'], 2),
+              Q('What is the time duration for JEE Mains?', ['2 hours 20 mins', '3 hours', '3 hours 20 mins', '4 hours'], 1),
+              Q('How many times can a student attempt NEET?', ['Till 18 years of age', 'Can give till 25 years of age', 'No restrictions', 'None of the above'], 2),
+              Q('How many questions are there in JEE Mains (to be answered)?', ['80', '60', '90', '75'], 3),
+              Q('What is the type & number of questions in Section B of JEE Mains Chemistry?', ['MCQ - 5', 'Numerical - 5', 'MCQ - 10', 'Numerical - 10'], 1),
+              Q('NEET is a _______________ test.', ['Mixed', 'CBT', 'Pen & Paper', 'None of the above'], 2),
+              Q('Paper 1 in JEE Mains is related to ______________.', ['B.E / B.Tech', 'B.Sc', 'B.Arch', 'B.Planning'], 0),
+              Q('JEE Mains is conducted by _________', ['IIT', 'NTA', 'NCERT', 'Zonal IITs'], 1),
+              Q('How many seats are available in IITs?', ['21000+', '23000+', '17000+', '10000+'], 2),
+              Q('What is the time duration for NEET?', ['2 hours 20 mins', '3 hours', '3 hours 20 mins', '4 hours'], 2),
+              Q('Is JEE Advanced qualification necessary for a seat in NIT?', ['True', 'False'], 1),
+              Q('JEE Advanced is conducted by __________', ['Zonal IITs', 'NCERT', 'NTA', 'None of the above'], 0),
+              Q('What is the aspirant count for JEE & NEET respectively?', ['10 Lakhs & 10 Lakhs', '14 Lakhs & 24 Lakhs', '24 Lakhs & 14 Lakhs', '24 Lakhs & 24 Lakhs'], 1),
+              Q('A student can write JEE Mains 6 times consecutively.', ['TRUE', 'FALSE'], 0),
+              Q('JEE Advanced is conducted once a year.', ['FALSE', 'TRUE'], 1),
+              Q('How many attempts are allowed for JEE Advanced?', ['Only once', '2 Consecutive Years', '3 Consecutive Years', 'Upto 30 years of age'], 1),
+              Q('When do the two sessions of JEE Mains take place?', ['January and April', 'May and June', 'July and August', 'November and December'], 0),
+              Q('What is the qualifying criteria to write JEE Advanced?', ['12th/equivalent appearing', '12th/equivalent passed', 'Top 250000 JEE Main qualifying rank', 'Not fixed'], 2),
+              Q('With a JEE Main score of 290, a student can secure a seat in IIT.', ['FALSE', 'TRUE'], 0),
+              Q('In how many languages is the NEET question paper provided?', ['10', '13', '15', '29'], 1),
+              Q('12th score required for JEE is?', ['No such criteria', '33% or only passing marks', 'Gen - 50% ; SC/ST/OBC - 40%', 'Gen/OBC - 75% ; SC/ST - 65%'], 3),
             ],
           },
         },

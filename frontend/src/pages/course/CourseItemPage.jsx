@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CheckCircle2, HelpCircle, ArrowLeft, Award } from 'lucide-react';
-import { courseApi } from '../../services/api.js';
+import { courseApi, default as api } from '../../services/api.js';
 import AppShell from '../../components/layout/AppShell.jsx';
 import { logApiError, getApiErrorMessage } from '../../utils/apiError.js';
 
@@ -14,6 +14,37 @@ import { logApiError, getApiErrorMessage } from '../../utils/apiError.js';
  * pages are always reviewable. Quiz: all questions at once, graded on the
  * server; passing a day's final quiz unlocks the next day.
  */
+
+function AuthSlideImage({ courseId, itemId, page }) {
+  const [src, setSrc] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let url = null;
+    let cancelled = false;
+    setSrc(null);
+    setFailed(false);
+    api.get(`/courses/${courseId}/items/${itemId}/slides/${page}`, { responseType: 'blob' })
+      .then((res) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(res.data);
+        setSrc(url);
+      })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [courseId, itemId, page]);
+
+  if (failed) return <div className="flex-1 flex items-center justify-center text-slate-400 text-sm py-20">This page is not unlocked yet.</div>;
+  if (!src) return <div className="flex-1 flex items-center justify-center text-slate-300 text-sm py-20">Loading slide…</div>;
+  return (
+    <img
+      src={src}
+      alt={`Slide ${page}`}
+      className="w-full rounded-lg border border-slate-100 select-none"
+      draggable="false"
+      onContextMenu={(e) => e.preventDefault()}
+    />
+  );
+}
 
 function QuizBlock({ questions, onSubmit, submitting, result, ctaLabel }) {
   const [answers, setAnswers] = useState({});
@@ -247,6 +278,10 @@ export default function CourseItemPage() {
               </div>
               <p className="text-slate-500 text-sm mb-4">Answer correctly to unlock the next pages. You can review earlier pages any time.</p>
               <QuizBlock questions={dueCheckpoint.questions} onSubmit={submitCheckpoint} submitting={submitting} result={quizResult} ctaLabel="Submit checkpoint" />
+            </div>
+          ) : current?.image ? (
+            <div className="p-4 flex-1 flex flex-col">
+              <AuthSlideImage courseId={courseId} itemId={itemId} page={current.page} />
             </div>
           ) : current ? (
             <div className="p-8 flex-1 flex flex-col">

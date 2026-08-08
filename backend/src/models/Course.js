@@ -27,9 +27,12 @@ const questionSchema = new mongoose.Schema(
 const slideSchema = new mongoose.Schema(
   {
     page: { type: Number, required: true },
-    title: { type: String, required: true },
+    title: { type: String, default: '' },
     bullets: { type: [String], default: [] },
     note: { type: String }, // e.g. reference to the source PPT link
+    // true = this page is a rendered image of the real PPT/PDF, streamed
+    // per-page through the gated slide endpoint (originals are never served)
+    image: { type: Boolean, default: false },
   },
   { _id: false }
 );

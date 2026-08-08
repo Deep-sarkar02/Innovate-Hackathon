@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import {
   listCourses, getSyllabus, getItem, advancePage, submitCheckpoint, submitQuiz,
+  getSlideFile,
 } from './course.service.js';
 
 const router = Router();
@@ -21,6 +22,14 @@ router.get('/:courseId', authenticate, async (req, res, next) => {
 router.get('/:courseId/items/:itemId', authenticate, async (req, res, next) => {
   try {
     res.json(await getItem(req.user.id, req.params.courseId, req.params.itemId));
+  } catch (e) { next(e); }
+});
+
+router.get('/:courseId/items/:itemId/slides/:page', authenticate, async (req, res, next) => {
+  try {
+    const file = await getSlideFile(req.user.id, req.params.courseId, req.params.itemId, req.params.page);
+    res.set('Cache-Control', 'private, max-age=600');
+    res.sendFile(file);
   } catch (e) { next(e); }
 });
 

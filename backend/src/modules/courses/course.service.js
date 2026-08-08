@@ -1,5 +1,13 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { Course } from '../../models/Course.js';
 import { CourseProgress } from '../../models/CourseProgress.js';
+
+// backend/media — deliberately OUTSIDE any express.static root. The original
+// PPT/PDF files are never copied here; only per-page JPEG renders, and those
+// are streamed one page at a time through the same gating as the deck.
+const MEDIA_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../media');
 
 /**
  * Server-authoritative course gating.
@@ -281,6 +289,37 @@ export async function submitQuiz(userId, courseId, itemId, answers) {
   }
   await progress.save();
   return { passed, passPct, ...result, dayUnlocked, courseCompleted };
+}
+
+/** Resolve a slide image on disk — ONLY if the requesting user has unlocked
+ *  that page. This is what makes the source decks non-downloadable: there is
+ *  no file URL, and page N+1 does not exist for you until you earned it. */
+export async function getSlideFile(userId, courseId, itemId, pageNum) {
+  const course = await Course.findOne({ courseId }).lean();
+  if (!course) throw err(404, 'Course not found');
+  const progress = await getProgress(userId, courseId);
+  const { day, item } = findItem(course, itemId);
+  if (day.day > progress.unlockedDay) throw err(403, 'Day locked');
+  if (item.type !== 'deck') throw err(400, 'Not a deck');
+
+  const st = itemState(progress, itemId);
+  const slides = item.deck?.slides ?? [];
+  const checkpoints = item.deck?.checkpoints ?? [];
+  let visibleLimit = Math.min(st.maxPage + 1, slides.length);
+  for (const cp of checkpoints) {
+    if (!st.checkpointsPassed.includes(cp.afterPage) && cp.afterPage < visibleLimit) {
+      visibleLimit = cp.afterPage;
+    }
+  }
+  const page = Number(pageNum);
+  if (!Number.isInteger(page) || page < 1 || page > visibleLimit) {
+    throw err(403, 'Page not unlocked yet');
+  }
+  const file = path.join(MEDIA_ROOT, 'decks', itemId, `${page}.jpg`);
+  if (!file.startsWith(path.join(MEDIA_ROOT, 'decks')) || !fs.existsSync(file)) {
+    throw err(404, 'Slide image not found');
+  }
+  return file;
 }
 
 export async function listCourses(userId) {
