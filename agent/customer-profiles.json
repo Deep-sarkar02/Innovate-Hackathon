@@ -138,6 +138,16 @@
         "asks what the test report showed"
       ],
       "booking_lands_after_call_minutes": "10-30"
+    },
+    "voice_requirements": {
+      "must_be_indian": true,
+      "why": "Every customer in this product is an Indian parent or student being cold-called by Infinity Learn. A non-Indian accent breaks the simulation as badly as a wrong gender — reps stop treating the call as real.",
+      "provider_capability": {
+        "sarvam": "FULL — Indian male and female, en-IN and hi-IN (aditya/rahul, priya/kavya). Preferred.",
+        "polly": "PARTIAL — female only (Kajal, en-IN + hi-IN, generative). NO Indian male voice exists in any region."
+      },
+      "rule": "If only Polly is configured, male personas are served by a US male voice as a stopgap and MUST be flagged in the UI. Configure SARVAM_API_KEY to serve them correctly.",
+      "verified": "Polly DescribeVoices (us-west-2, IncludeAdditionalLanguageCodes) — zero Indian-locale male voices."
     }
   },
   "profiles": [
@@ -223,9 +233,49 @@
       "voice": {
         "gender": "male",
         "voice_brief": "adult male, 40s, Hindi-dominant Hinglish, warm but businesslike",
-        "elevenlabs_voice_id": "SET_MALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "aditya",
+              "hi": "rahul"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "hi": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "indian_accent": false,
+            "gender_match": true,
+            "compliant": false,
+            "non_compliance": "STOPGAP ONLY — Matthew is a US voice. Polly has NO Indian-locale male voice (verified via DescribeVoices incl. AdditionalLanguageCodes: en-IN = Raveena, Aditi, Kajal; hi-IN = Aditi, Kajal — all female). An Indian parent must not sound American. Use Sarvam for every male persona."
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_MALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -309,9 +359,48 @@
       "voice": {
         "gender": "female",
         "voice_brief": "adult female, mid-30s, English-leaning Hinglish, soft and cautious",
-        "elevenlabs_voice_id": "SET_FEMALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "priya",
+              "hi": "kavya"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Kajal",
+              "language_code": "en-IN",
+              "engine": "generative"
+            },
+            "hi": {
+              "voice_id": "Kajal",
+              "language_code": "hi-IN",
+              "engine": "generative"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_FEMALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -381,9 +470,49 @@
       "voice": {
         "gender": "male",
         "voice_brief": "adult male, late 30s, simple Hinglish with eastern cadence, warm",
-        "elevenlabs_voice_id": "SET_MALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "aditya",
+              "hi": "rahul"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "hi": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "indian_accent": false,
+            "gender_match": true,
+            "compliant": false,
+            "non_compliance": "STOPGAP ONLY — Matthew is a US voice. Polly has NO Indian-locale male voice (verified via DescribeVoices incl. AdditionalLanguageCodes: en-IN = Raveena, Aditi, Kajal; hi-IN = Aditi, Kajal — all female). An Indian parent must not sound American. Use Sarvam for every male persona."
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_MALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -467,9 +596,49 @@
       "voice": {
         "gender": "male",
         "voice_brief": "adult male, mid-40s, fluent formal English, measured and evaluative",
-        "elevenlabs_voice_id": "SET_MALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "aditya",
+              "hi": "rahul"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "hi": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "indian_accent": false,
+            "gender_match": true,
+            "compliant": false,
+            "non_compliance": "STOPGAP ONLY — Matthew is a US voice. Polly has NO Indian-locale male voice (verified via DescribeVoices incl. AdditionalLanguageCodes: en-IN = Raveena, Aditi, Kajal; hi-IN = Aditi, Kajal — all female). An Indian parent must not sound American. Use Sarvam for every male persona."
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_MALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -547,9 +716,48 @@
       "voice": {
         "gender": "female",
         "voice_brief": "adult female, late 30s, fluent urban English, poised and discerning",
-        "elevenlabs_voice_id": "SET_FEMALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "priya",
+              "hi": "kavya"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Kajal",
+              "language_code": "en-IN",
+              "engine": "generative"
+            },
+            "hi": {
+              "voice_id": "Kajal",
+              "language_code": "hi-IN",
+              "engine": "generative"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_FEMALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -619,9 +827,49 @@
       "voice": {
         "gender": "male",
         "voice_brief": "teenage male, 14, casual Hinglish, higher pitch, slightly hesitant",
-        "elevenlabs_voice_id": "SET_MALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. A female voice speaking as the father was the #1 immersion break in live testing."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "aditya",
+              "hi": "rahul"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "hi": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "indian_accent": false,
+            "gender_match": true,
+            "compliant": false,
+            "non_compliance": "STOPGAP ONLY — Matthew is a US voice. Polly has NO Indian-locale male voice (verified via DescribeVoices incl. AdditionalLanguageCodes: en-IN = Raveena, Aditi, Kajal; hi-IN = Aditi, Kajal — all female). An Indian parent must not sound American. Use Sarvam for every male persona."
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_MALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       }
     },
     {
@@ -650,9 +898,49 @@
       "voice": {
         "gender": "male",
         "voice_brief": "adult male, early 40s, brisk and slightly impatient, Hindi-dominant Hinglish",
-        "elevenlabs_voice_id": "SET_MALE_VOICE_ID",
         "must_match_persona_role": true,
-        "_warning": "Voice gender MUST match persona.role. Polly has no Indian male voice — see tts.service.js resolveVoice()."
+        "must_be_indian": true,
+        "preferred_provider": "sarvam",
+        "providers": {
+          "sarvam": {
+            "model": "bulbul:v3",
+            "speaker": {
+              "en": "aditya",
+              "hi": "rahul"
+            },
+            "language_code": {
+              "en": "en-IN",
+              "hi": "hi-IN"
+            },
+            "indian_accent": true,
+            "gender_match": true,
+            "compliant": true
+          },
+          "polly": {
+            "en": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "hi": {
+              "voice_id": "Matthew",
+              "language_code": "en-US",
+              "engine": "neural"
+            },
+            "indian_accent": false,
+            "gender_match": true,
+            "compliant": false,
+            "non_compliance": "STOPGAP ONLY — Matthew is a US voice. Polly has NO Indian-locale male voice (verified via DescribeVoices incl. AdditionalLanguageCodes: en-IN = Raveena, Aditi, Kajal; hi-IN = Aditi, Kajal — all female). An Indian parent must not sound American. Use Sarvam for every male persona."
+          },
+          "elevenlabs": {
+            "voice_id": "SET_INDIAN_MALE_VOICE_ID",
+            "requirement": "Must be an Indian-accented native speaker. Do not use a generic US/UK voice.",
+            "indian_accent": null,
+            "gender_match": true,
+            "compliant": null
+          }
+        },
+        "_warning": "Voice gender MUST match persona.role AND the voice MUST be Indian. A female voice as the father was the #1 immersion break in live testing; a US-accented voice as an Indian parent is the #2. Polly satisfies both ONLY for female personas — male personas require Sarvam."
       },
       "state_variables": {
         "trust": 12,

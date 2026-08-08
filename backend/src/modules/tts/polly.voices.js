@@ -27,10 +27,14 @@ export const POLLY_VOICES = {
   en: {
     female: {
       voiceId: 'Kajal',
-      engine: 'neural',
+      // Kajal is the only Indian voice with a generative engine — noticeably
+      // more expressive than neural, which matters because flat, linear
+      // delivery was a live-test complaint.
+      engine: 'generative',
       languageCode: 'en-IN',
-      label: 'Kajal · Indian English (female, neural)',
+      label: 'Kajal · Indian English (female, generative)',
       genderMatch: true,
+      indianAccent: true,
     },
     // No Indian-English male voice exists in Polly. Nearest correct-gender
     // option is a US male; accent is wrong but the character is not.
@@ -38,19 +42,22 @@ export const POLLY_VOICES = {
       voiceId: 'Matthew',
       engine: 'neural',
       languageCode: 'en-US',
-      label: 'Matthew · US English (male) — no Indian male voice in Polly',
+      label: 'Matthew · US English (male) — NOT an Indian voice',
       genderMatch: true,
       accentMismatch: true,
-      warning: 'Polly has no Indian-English male voice; using Matthew (en-US). Configure Sarvam for an Indian male voice.',
+      indianAccent: false,
+      meetsIndianRequirement: false,
+      warning: 'STOPGAP: every customer in this product is an Indian parent, but Polly has no Indian male voice in any region — Matthew is American. Set SARVAM_API_KEY to voice male personas as Indian (aditya, en-IN).',
     },
   },
   hi: {
     female: {
       voiceId: 'Kajal',
-      engine: 'neural',
+      engine: 'generative',
       languageCode: 'hi-IN',
-      label: 'Kajal · Hindi (female, neural)',
+      label: 'Kajal · Hindi (female, generative)',
       genderMatch: true,
+      indianAccent: true,
     },
     // Polly has NO Hindi male voice at all. Keeping gender correct means
     // losing Hindi entirely for this persona.
@@ -58,11 +65,13 @@ export const POLLY_VOICES = {
       voiceId: 'Matthew',
       engine: 'neural',
       languageCode: 'en-US',
-      label: 'Matthew · US English (male) — Polly has no Hindi male voice',
+      label: 'Matthew · US English (male) — NOT an Indian voice, and not Hindi',
       genderMatch: true,
       accentMismatch: true,
       languageDowngrade: true,
-      warning: 'Polly has no Hindi male voice (only Aditi and Kajal speak Hindi, both female). Falling back to Matthew (en-US) to keep the gender correct. Configure Sarvam for a Hindi male voice (rahul).',
+      indianAccent: false,
+      meetsIndianRequirement: false,
+      warning: 'STOPGAP: Polly has no Hindi male voice at all (only Aditi and Kajal speak Hindi, both female), so a Hindi-speaking father falls back to Matthew — American, and speaking English phonemes. Set SARVAM_API_KEY to voice him correctly (rahul, hi-IN).',
     },
   },
 };
